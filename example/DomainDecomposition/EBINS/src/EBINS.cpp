@@ -55,14 +55,19 @@ EBINS(shared_ptr<EBEncyclopedia<2, Real> >   & a_brit,
   if(!m_eulerCalc)
   {
     Real alpha = 1; Real beta = 1; //these get reset before solve
+    string helmnames[2*DIM];
+    a_ibc.helmholtzStencilStrings(helmnames);
     m_helmholtz = shared_ptr<EBMultigrid> 
       (new EBMultigrid(cell_dict, m_geoserv, alpha, beta, m_dx, m_grids,  
-                       stenname, bcname, bcname, m_domain, m_nghost, m_nghost));
+                       stenname, helmnames, bcname, m_domain, m_nghost, m_nghost));
   }
   m_advectOp = shared_ptr<EBAdvection>
     (new EBAdvection(m_brit, m_geoserv, m_velo, m_grids, m_domain, m_dx, m_nghost, m_nghost));
+  
+  string projnames[2*DIM];
+  a_ibc.projectionStencilStrings(projnames);
   m_ccProj  = shared_ptr<EBCCProjector>
-    (new EBCCProjector(m_brit, m_geoserv, m_grids, m_domain, m_dx, m_nghost));
+    (new EBCCProjector(m_brit, m_geoserv, m_grids, m_domain, m_dx, m_nghost, projnames));
   m_macProj = m_ccProj->m_macprojector;
 
   m_bcgAdvect = shared_ptr<BCGVelAdvect>
@@ -162,9 +167,10 @@ initializePressure(Real         a_dt,
 
   //project the resulting field
   pout() << "projecting initial velocity"<< endl;
-  auto & gphi =  (*m_gphi );  
+  auto & gphi =  (*m_gphi );
+  velo.exchange(m_exchangeCopier);
   m_ccProj->project(velo, gphi, a_tol, a_maxIter);
-
+  velo.exchange(m_exchangeCopier);
 
   EBLevelBoxData<CELL, DIM> velosave(m_grids, m_nghost, m_graphs);
   Interval interv(0, DIM-1);
@@ -175,6 +181,7 @@ initializePressure(Real         a_dt,
     advanceVelocityAndPressure(a_dt, a_tol, a_maxIter);
     velosave.copyTo(interv, velo, interv, m_copyCopier);
   }
+  gphi.exchange(m_exchangeCopier);
 }
 /*******/ 
 Real
@@ -228,7 +235,8 @@ advanceVelocityEuler(Real a_dt)
 {
   auto & velo =  (*m_velo );
   auto & udel =  (*m_divuu);
-  auto & gphi =  (*m_gphi );  
+  auto & gphi =  (*m_gphi );
+
   DataIterator dit = m_grids.dataIterator();
   for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
   {
@@ -334,6 +342,7 @@ projectVelocityAndCorrectPressure(Real a_dt,
 
   //project the resulting field
   pout() << "cc projecting vel + gphi*dt" << endl;
+  velo.exchange(m_exchangeCopier);
   m_ccProj->project(velo, gphi, a_tol, a_maxIter);
 
   //the resulting pressure  is = dt * gphi so we need to divide out the dt
