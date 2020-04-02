@@ -305,6 +305,8 @@ void BoxLayoutData<T>::makeItSoLocalCopy(const Interval&   a_srcComps,
 #ifdef _OPENMP
   bool threadSafe = m_threadSafe && (a_op.threadSafe());
 #endif
+
+#pragma omp parallel for schedule(dynamic)
   for (int n=0; n<items; n++)
   {
     const MotionItem& item = it[n];
@@ -657,6 +659,8 @@ void BoxLayoutData<T>::writeSendDataFromMeIntoBuffers(const BoxLayoutData<T>& a_
 #ifdef _OPENMP
   bool threadSafe = m_threadSafe && (a_op.threadSafe());
 #endif
+
+#pragma omp parallel for schedule(dynamic)
   for (unsigned int i=0; i< isize; ++i)
     {
       const CopierBuffer::bufEntry& entry = m_buff->m_fromMe[i];
@@ -818,6 +822,8 @@ void BoxLayoutData<T>::unpackReceivesToMe(
 #ifdef _OPENMP
     bool threadSafe = m_threadSafe && (a_op.threadSafe());
 #endif
+
+#pragma omp parallel for schedule(dynamic)
     for (unsigned int i=0; i< isize; ++i)
     {
       const CopierBuffer::bufEntry& entry = m_buff->m_toMe[i];
