@@ -151,8 +151,15 @@ public:
   /// Simplest case -- do all components
    void exchange(void);
 
-  /// Simplest case -- do all components. Accepts a pre-built copier.
+#ifdef DTD
+  /// Simplest case -- do all components in the device mem. Accepts a pre-built copier.
+   void exchange_VGPU(const Copier& copier);
+#endif
+
+
+    /// Simplest case -- do all components. Accepts a pre-built copier.
    void exchange(const Copier& copier);
+
 
   /// Accepts an arbitrary component range
    void exchange(const Interval& comps);

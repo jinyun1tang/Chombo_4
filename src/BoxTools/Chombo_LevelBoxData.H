@@ -118,13 +118,48 @@ public:
 // LevelData<FArrayBox> hostdata(this->disjointBoxLayout(), NUMCOMPS, this->m_ghost);
     CH_STOP(t0);
     CH_START(t1);
+
+#ifndef DTD
     copyToHost(m_host, *this);
+#else
+ //   copyToHost(m_host, m_device);
+#endif
     CH_STOP(t1);
     CH_START(t2);
+
+#ifdef DTD
+    // perform local copy into device
+  // keep only the local copy
+  LDOperator<BoxData<Real, NUMCOMPS> > a_op=LDOperator<BoxData<Real, NUMCOMPS> >();
+
+  {
+    CH_TIME("makeItSoBegin");
+    this->makeItSoBegin(this->interval(), *this, *this, this->interval(), copier, a_op);
+  }
+
+
+  this->makeItSoLocalCopy(this->interval(), *this, *this, this->interval(), copier, a_op);
+
+  {
+      CH_TIME("makeItSoEnd");
+    this->makeItSoEnd(this->interval(), a_op);
+  }
+
+ //   this->exchange(copier);
+
+#else // ONE GPU WARNING
     m_host.exchange(copier);
+//  LDOperator<FArrayBox> a_op=LDOperator<FArrayBox>();
+//  m_host.makeItSoLocalCopy(m_host.interval(), m_host, m_host, m_host.interval(), copier, a_op);
+#endif
+
     CH_STOP(t2);
     CH_START(t3);
+#ifndef DTD
     copyToDevice(*this, m_host);
+#else
+  //  copyToDevice(m_device, m_host);
+#endif
     CH_STOP(t3);
   }
     
@@ -141,6 +176,35 @@ public:
 #endif
   }
 
+
+#ifdef DTD
+
+  static
+  void copyToHost_VGPU(LevelData<BoxData<Real, NUMCOMPS> >   & m_device,
+                       LevelData<BoxData<Real, NUMCOMPS> > & a_deviDat)
+  {
+ 	std::cout << " duplication data device " << std::endl;
+
+       	//a_deviDat.copyTo(m_device);
+
+//	m_device.define(a_deviDat);
+	
+
+  }
+
+
+
+    ///
+  static
+  void copyToDevice_VGPU(LevelData<BoxData<Real, NUMCOMPS> > & a_deviDat,
+                    LevelData<BoxData<Real, NUMCOMPS> >  & m_device)
+  {
+  //      std::cout << " --duplication data device " << std::endl;
+   //     m_device.copyTo(a_deviDat);
+  }
+
+#endif
+
   ///
   static 
   void copyToHost(LevelData<FArrayBox>                      & a_hostDat,
@@ -154,6 +218,7 @@ public:
       size_t datSize = sizeof(Real)*devifab.size();
       Real*       hostPtr = hostfab.dataPtr(0);
       const Real* deviPtr = devifab.dataPtr(0);
+
 #ifdef PROTO_CUDA
       //cudaMemcpy(hostPtr, deviPtr, datSize, cudaMemcpyDeviceToHost);
       //cudaStreamSynchronize(Proto::DisjointBoxLayout::getCurrentStream());
@@ -167,7 +232,7 @@ public:
       }
 #else
       memcpy(hostPtr, deviPtr, datSize);
-#endif  
+#endif
     }
   }
 
@@ -184,6 +249,7 @@ public:
       size_t datSize = sizeof(Real)*devifab.size();
       const Real* hostPtr = hostfab.dataPtr(0);
       Real*       deviPtr = devifab.dataPtr(0);
+
 #ifdef PROTO_CUDA
       cudaDeviceSynchronize();
       cudaMemcpyAsync(deviPtr, hostPtr, datSize, cudaMemcpyHostToDevice, Proto::DisjointBoxLayout::getCurrentStream());
@@ -205,6 +271,10 @@ private:
   LevelData<FArrayBox> m_host;
   LevelData<FArrayBox> m_hostSrc;
   LevelData<FArrayBox> m_hostDst;
+
+#ifdef DTD
+ LevelData<BoxData<Real, NUMCOMPS> > m_device;
+#endif
 };
 
 

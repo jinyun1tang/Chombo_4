@@ -333,6 +333,36 @@ void BoxLayoutData<T>::makeItSoLocalCopy(const Interval&   a_srcComps,
 
   }
 }
+
+
+#ifdef DTD
+template<class T>
+void BoxLayoutData<T>::makeItSoLocalCopy_VGPU(const Interval&   a_srcComps,
+                                          const BoxLayoutData<T>& a_src,
+                                          BoxLayoutData<T>& a_dest,
+                                          const Interval&   a_destComps,
+                                          const Copier&     a_copier,
+                                          const LDOperator<T>& a_op) const
+{
+
+  CH_TIME("local copying vGPU");
+  CopyIterator it(a_copier, CopyIterator::LOCAL);
+  int items=it.size();
+  
+  for (int n=0; n<items; n++)
+  {
+    const MotionItem& item = it[n];
+    a_op.op(a_dest[item.toIndex], item.fromRegion,
+            a_destComps,
+            item.toRegion,
+            a_src[item.fromIndex],
+            a_srcComps);
+
+  }
+}
+#endif
+
+
 template<class T>
 void BoxLayoutData<T>::makeItSoEnd(
                                    const Interval&   a_destComps,
@@ -592,7 +622,14 @@ void BoxLayoutData<T>::allocateBuffers(const BoxLayoutData<T>& a_src,
     {
       free((m_buff->m_sendbuffer));
       if (s_verbosity > 0) pout()<<"malloc send buffer "<<sendBufferSize<<std::endl;
+      
+#ifdef DTD
+      std::cout << " sendBufferSize = " << sendBufferSize << std::endl;
+      cudaMalloc((void**)&(m_buff->m_sendbuffer) ,sendBufferSize);
+#else      
       (m_buff->m_sendbuffer) = malloc(sendBufferSize);
+#endif
+
       if ((m_buff->m_sendbuffer) == NULL)
         {
           MayDay::Error("Out of memory in BoxLayoutData::allocatebuffers");
@@ -604,7 +641,13 @@ void BoxLayoutData<T>::allocateBuffers(const BoxLayoutData<T>& a_src,
     {
       free(m_buff->m_recbuffer);
       if (s_verbosity > 0) pout()<<"malloc receive buffer "<<recBufferSize<<std::endl;
-      m_buff->m_recbuffer = malloc(recBufferSize);
+
+#ifdef DTD
+      std::cout << " recBufferSize = " << recBufferSize << std::endl;
+      cudaMalloc( (void**)&( m_buff->m_recbuffer),recBufferSize);
+#else
+      m_buff->m_recbuffer = malloc(recBufferSize);	
+#endif
       if (m_buff->m_recbuffer == NULL)
         {
           MayDay::Error("Out of memory in BoxLayoutData::allocatebuffers");
@@ -663,6 +706,11 @@ void BoxLayoutData<T>::writeSendDataFromMeIntoBuffers(const BoxLayoutData<T>& a_
       a_op.linearOut(a_src[entry.item->fromIndex], entry.bufPtr,
                      entry.item->fromRegion, a_srcComps);
     }
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
+
 }
 
 template<class T>
@@ -671,6 +719,10 @@ void BoxLayoutData<T>::postSendsFromMe() const
   CH_TIME("post_Sends");
   // now we get the magic of message coalescence
   // fromMe has already been sorted in the allocateBuffers() step.
+
+/*#ifdef DTD
+  cudaDeviceSynchronization()
+#endif*/
 
   this->m_buff->numSends = m_buff->m_fromMe.size();
 

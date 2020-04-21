@@ -456,6 +456,25 @@ void LevelData<T>::exchange(const Copier& copier)
   CH_TIME("LevelData::exchange");
   exchange(this->interval(), copier);
 }
+
+
+//-----------------------------------------------------------------------
+
+//-----------------------------------------------------------------------
+#ifdef DTD 
+template<class T>
+void LevelData<T>::exchange_VGPU(const Copier& copier)
+{
+  CH_TIME("LevelData::exchange_VGPU");
+
+
+  // keep only the local copy
+  LDOperator<T> a_op=LDOperator<T>();
+  this->makeItSoLocalCopy_VGPU(this->interval(), *this, *this, this->interval(), copier, a_op);
+}
+#endif
+
+
 //-----------------------------------------------------------------------
 
 //-----------------------------------------------------------------------

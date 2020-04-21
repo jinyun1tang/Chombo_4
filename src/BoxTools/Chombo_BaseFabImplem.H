@@ -522,6 +522,30 @@ template <class T> inline size_t BaseFab<T>::size(const Box&      a_box,
   return a_box.numPts() * (sizeof(T) * a_comps.size());
 }
 
+#ifdef DTD
+
+// cheat
+template <class T> inline void BaseFab<T>::linearOut(void*           a_buf,
+                                                     const ::Proto::Box&      a_R,
+                                                     const ::Proto::CInterval& a_comps) const
+{
+	Box b_R = ProtoCh::getBox(a_R); 
+	Interval b_comp(a_comps.low(0),a_comps.high(0));       	
+	linearOut(a_buf, b_R, b_comp);
+}
+
+template <class T> inline void BaseFab<T>::linearIn(void*           a_buf,
+                                                     const ::Proto::Box&      a_R,
+                                                     const ::Proto::CInterval& a_comps)
+{
+        Box b_R = ProtoCh::getBox(a_R);
+        Interval b_comp(a_comps.low(0),a_comps.high(0));
+        linearIn(a_buf, b_R, b_comp);
+}
+
+#endif
+
+
 template <class T> inline void BaseFab<T>::linearOut(void*           a_buf,
                                                      const Box&      a_R,
                                                      const Interval& a_comps) const
@@ -753,6 +777,42 @@ inline void BaseFab<T>::performCopy(const BaseFab<T>& a_src,
 */
   }
 }
+
+
+/*
+template <class T>
+inline void BaseFab<T>::performCopy_VGPU(const BaseFab<T>& a_src,
+                                    const Box&        a_srcbox,
+                                    int               a_srccomp,
+                                    const Box&        a_dstbox,
+                                    int               a_dstcomp,
+                                    int               a_numcomp)
+{
+  CH_assert(a_src.box().contains(a_srcbox));
+  CH_assert(box().contains(a_dstbox));
+  CH_assert(a_dstbox.sameSize(a_srcbox));
+  CH_assert(a_srccomp  >= 0 && a_srccomp  + a_numcomp <= a_src.nComp());
+  CH_assert(a_dstcomp >= 0 && a_dstcomp + a_numcomp <= nComp());
+  CH_TIME("BaseFab::performCopy_VGPU");
+  IntVect shiftiv = a_srcbox.smallEnd() - a_dstbox.smallEnd();
+
+
+  if (a_src.box()==box() && box()==a_srcbox && a_srcbox==a_dstbox) {
+      int npts = box().numPts();
+      for (int icomp = 0; icomp < a_numcomp; icomp++) {
+          const T* srcPtr = a_src.dataPtr(icomp);
+          T* dstPtr = this->dataPtr(icomp);
+          for (int ibox = 0; ibox < npts; ibox++)
+              *(dstPtr+ibox) = *(srcPtr+ibox);
+      }
+  } else {
+      Box r = a_srcbox & a_dstbox;
+      BFM<CH_SPACEDIM>(dataPtr(), a_src.dataPtr(), box(), a_src.box(), a_dstcomp, a_srccomp, a_numcomp, r,
+              [](T* __restrict d, T s) { (*d) = s; });
+  }
+}
+*/
+
 
 template <class T> inline void BaseFab<T>::performSetVal(T          a_x,
                                                          const Box& a_bx,

@@ -424,6 +424,19 @@ public:
     return copy(a_src, srcbox, a_srccomp, dstbox, a_dstcomp, a_numcomp);
   }
 
+#ifdef DTD
+  BaseFab<T>& copyGPU(const BaseFab<T>&  a_src,
+                   const ::Proto::Box&  a_srcbox,
+                   int                a_srccomp,
+                   const ::Proto::Box&  a_dstbox,
+                   int                a_dstcomp,
+                   int                a_numcomp)
+  {
+  }
+
+#endif
+
+
   /**
      Modifies this BaseFab by copying the contents of the argument BaseFab
      into it.  A copy within the intersecting region of the domains of the
@@ -528,6 +541,15 @@ public:
     Box chbox = ProtoCh::getBox(a_bx);
     return size(chbox, interv);
   }
+
+#ifdef DTD
+
+  void linearOut(void* a_buf, const ::Proto::Box& a_R, const ::Proto::CInterval& a_comps) const;
+  void linearIn(void* a_buf, const ::Proto::Box& a_R, const ::Proto::CInterval& a_comps);
+
+
+#endif
+
 
   ///
   /**
