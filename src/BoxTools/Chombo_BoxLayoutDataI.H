@@ -720,9 +720,9 @@ void BoxLayoutData<T>::postSendsFromMe() const
   // now we get the magic of message coalescence
   // fromMe has already been sorted in the allocateBuffers() step.
 
-/*#ifdef DTD
+#ifdef DTD
   cudaDeviceSynchronization()
-#endif*/
+#endif
 
   this->m_buff->numSends = m_buff->m_fromMe.size();
 
@@ -740,6 +740,10 @@ void BoxLayoutData<T>::postSendsFromMe() const
   }
   m_buff->m_sendRequests.resize(this->m_buff->numSends);
   std::list<MPI_Request> extraRequests;
+
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
 
   unsigned int next=0;
   long long maxSize = 0;
@@ -785,6 +789,10 @@ template<class T>
 void BoxLayoutData<T>::postReceivesToMe() const
 {
   CH_TIME("post_Receives");
+  #ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
   this->m_buff->numReceives = m_buff->m_toMe.size();
 
   if (this->m_buff->numReceives > 1)
@@ -804,6 +812,13 @@ void BoxLayoutData<T>::postReceivesToMe() const
   std::list<MPI_Request> extraRequests;
   unsigned int next=0;
   long long maxSize = 0;
+
+
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
+
   for (int i=0; i<this->m_buff->numReceives; ++i)
     {
       const CopierBuffer::bufEntry& entry = m_buff->m_toMe[next];
@@ -832,6 +847,12 @@ void BoxLayoutData<T>::postReceivesToMe() const
       maxSize = std::max<long long>(bsize, maxSize);
       while (next < m_buff->m_toMe.size() && m_buff->m_toMe[next].size == 0) ++next;
     }
+
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
+
   for (std::list<MPI_Request>::iterator it = extraRequests.begin(); it != extraRequests.end(); ++it)
   {
     m_buff->m_receiveRequests.push_back(*it);
@@ -851,6 +872,11 @@ void BoxLayoutData<T>::unpackReceivesToMe(
 
   CH_TIME("unpack_messages");
   
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
+
   if (this->m_buff->numReceives > 0)
   {
     m_buff->m_receiveStatus.resize(this->m_buff->numReceives);
@@ -878,6 +904,11 @@ void BoxLayoutData<T>::unpackReceivesToMe(
     }
   }
   this->m_buff->numReceives = 0;
+
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
 }
 
 template<class T>
@@ -888,6 +919,9 @@ void BoxLayoutData<T>::unpackReceivesToMe_append(LayoutData<Vector<RefCountedPtr
 
                                                  const LDOperator<T>& a_op) const
 {
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
 
   if (this->m_buff->numReceives > 0)
   {
@@ -916,6 +950,11 @@ void BoxLayoutData<T>::unpackReceivesToMe_append(LayoutData<Vector<RefCountedPtr
   }
 
   this->m_buff->numReceives = 0;
+
+#ifdef DTD
+  cudaDeviceSynchronize();
+#endif
+
 }
 #endif
 

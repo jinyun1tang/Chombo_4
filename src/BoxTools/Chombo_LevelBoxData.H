@@ -145,8 +145,8 @@ public:
     this->makeItSoEnd(this->interval(), a_op);
   }
 
- //   this->exchange(copier);
-
+   // this->exchange(copier);
+   //this->exchangeNoOverlap(copier);
 #else // ONE GPU WARNING
     m_host.exchange(copier);
 //  LDOperator<FArrayBox> a_op=LDOperator<FArrayBox>();

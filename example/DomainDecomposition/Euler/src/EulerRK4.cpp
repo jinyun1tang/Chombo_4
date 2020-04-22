@@ -135,10 +135,20 @@ operator()(EulerDX& a_DX,
 
   EulerOp::step(*a_DX.m_DU, U_ave, a_State.m_Rxn);
 
+
+#ifdef DTD
+  // must be removed
   for(int ibox = 0; ibox <  dit.size(); ibox++)
   {
     delta[dit[ibox]] *= a_dt;
   }
+#else
+  for(int ibox = 0; ibox <  dit.size(); ibox++)
+  {
+    delta[dit[ibox]] *= a_dt;
+  }
+#endif
+
   CH_STOP(trk);
 }
 
