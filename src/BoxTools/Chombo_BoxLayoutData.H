@@ -238,9 +238,6 @@ public:
 //      dest.copy(RegionFrom, Cdest,RegionTo, src, Csrc);
       dest.copy(src, bxFr, isrc, bxTo, idst, inco);
 
-//     dest.copyGPU(src, bxFr, isrc, bxTo, idst, inco);
-
-
 #ifdef DTD
 //    std::cout << " marco " << std::endl;
 #endif

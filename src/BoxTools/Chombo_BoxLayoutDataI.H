@@ -624,8 +624,11 @@ void BoxLayoutData<T>::allocateBuffers(const BoxLayoutData<T>& a_src,
       if (s_verbosity > 0) pout()<<"malloc send buffer "<<sendBufferSize<<std::endl;
       
 #ifdef DTD
-      std::cout << " sendBufferSize = " << sendBufferSize << std::endl;
+#ifdef PROTO_CUDA
       cudaMalloc((void**)&(m_buff->m_sendbuffer) ,sendBufferSize);
+#else
+      (m_buff->m_sendbuffer) = malloc(sendBufferSize);
+#endif
 #else      
       (m_buff->m_sendbuffer) = malloc(sendBufferSize);
 #endif
@@ -643,8 +646,11 @@ void BoxLayoutData<T>::allocateBuffers(const BoxLayoutData<T>& a_src,
       if (s_verbosity > 0) pout()<<"malloc receive buffer "<<recBufferSize<<std::endl;
 
 #ifdef DTD
-      std::cout << " recBufferSize = " << recBufferSize << std::endl;
+#ifdef PROTO_CUDA
       cudaMalloc( (void**)&( m_buff->m_recbuffer),recBufferSize);
+#else
+      m_buff->m_recbuffer = malloc(recBufferSize);
+#endif
 #else
       m_buff->m_recbuffer = malloc(recBufferSize);	
 #endif
@@ -706,10 +712,6 @@ void BoxLayoutData<T>::writeSendDataFromMeIntoBuffers(const BoxLayoutData<T>& a_
       a_op.linearOut(a_src[entry.item->fromIndex], entry.bufPtr,
                      entry.item->fromRegion, a_srcComps);
     }
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
-
 
 }
 
@@ -719,10 +721,6 @@ void BoxLayoutData<T>::postSendsFromMe() const
   CH_TIME("post_Sends");
   // now we get the magic of message coalescence
   // fromMe has already been sorted in the allocateBuffers() step.
-
-#ifdef DTD
-  cudaDeviceSynchronization()
-#endif
 
   this->m_buff->numSends = m_buff->m_fromMe.size();
 
@@ -740,10 +738,6 @@ void BoxLayoutData<T>::postSendsFromMe() const
   }
   m_buff->m_sendRequests.resize(this->m_buff->numSends);
   std::list<MPI_Request> extraRequests;
-
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
 
   unsigned int next=0;
   long long maxSize = 0;
@@ -789,9 +783,6 @@ template<class T>
 void BoxLayoutData<T>::postReceivesToMe() const
 {
   CH_TIME("post_Receives");
-  #ifdef DTD
-  cudaDeviceSynchronize();
-#endif
 
   this->m_buff->numReceives = m_buff->m_toMe.size();
 
@@ -812,12 +803,6 @@ void BoxLayoutData<T>::postReceivesToMe() const
   std::list<MPI_Request> extraRequests;
   unsigned int next=0;
   long long maxSize = 0;
-
-
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
-
 
   for (int i=0; i<this->m_buff->numReceives; ++i)
     {
@@ -848,11 +833,6 @@ void BoxLayoutData<T>::postReceivesToMe() const
       while (next < m_buff->m_toMe.size() && m_buff->m_toMe[next].size == 0) ++next;
     }
 
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
-
-
   for (std::list<MPI_Request>::iterator it = extraRequests.begin(); it != extraRequests.end(); ++it)
   {
     m_buff->m_receiveRequests.push_back(*it);
@@ -860,7 +840,6 @@ void BoxLayoutData<T>::postReceivesToMe() const
   this->m_buff->numReceives = m_buff->m_receiveRequests.size();
 
   CH4_SPMD::CH_MaxMPIRecvSize = std::max<long long>(CH4_SPMD::CH_MaxMPIRecvSize, maxSize);
-  //pout()<<"maxSize="<<maxSize<<" posted "<<this->m_buff->numReceives<<" receives\n";
 
 }
 
@@ -869,14 +848,8 @@ void BoxLayoutData<T>::unpackReceivesToMe(
                                           const Interval&   a_destComps,
                                           const LDOperator<T>& a_op)
 {
-
   CH_TIME("unpack_messages");
   
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
-
-
   if (this->m_buff->numReceives > 0)
   {
     m_buff->m_receiveStatus.resize(this->m_buff->numReceives);
@@ -903,11 +876,8 @@ void BoxLayoutData<T>::unpackReceivesToMe(
                     entry.item->toRegion, a_destComps);
     }
   }
-  this->m_buff->numReceives = 0;
 
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
+  this->m_buff->numReceives = 0;
 
 }
 
@@ -919,10 +889,6 @@ void BoxLayoutData<T>::unpackReceivesToMe_append(LayoutData<Vector<RefCountedPtr
 
                                                  const LDOperator<T>& a_op) const
 {
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
-
   if (this->m_buff->numReceives > 0)
   {
    m_buff->m_receiveStatus.resize(this->m_buff->numReceives);
@@ -938,6 +904,8 @@ void BoxLayoutData<T>::unpackReceivesToMe_append(LayoutData<Vector<RefCountedPtr
    }
    int isize = m_buff->m_toMe.size();
    // NOT thread-safe, because of a_dest[item.toIndex].push_back(newT);
+
+
    for (int i=0; i< isize; ++i)
    {
      const CopierBuffer::bufEntry& entry = m_buff->m_toMe[i];
@@ -950,11 +918,6 @@ void BoxLayoutData<T>::unpackReceivesToMe_append(LayoutData<Vector<RefCountedPtr
   }
 
   this->m_buff->numReceives = 0;
-
-#ifdef DTD
-  cudaDeviceSynchronize();
-#endif
-
 }
 #endif
 

@@ -524,7 +524,7 @@ template <class T> inline size_t BaseFab<T>::size(const Box&      a_box,
 
 #ifdef DTD
 
-// cheat
+// trick
 template <class T> inline void BaseFab<T>::linearOut(void*           a_buf,
                                                      const ::Proto::Box&      a_R,
                                                      const ::Proto::CInterval& a_comps) const
