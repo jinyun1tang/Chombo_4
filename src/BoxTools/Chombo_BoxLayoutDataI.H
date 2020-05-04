@@ -306,8 +306,6 @@ void BoxLayoutData<T>::makeItSoLocalCopy(const Interval&   a_srcComps,
   bool threadSafe = m_threadSafe && (a_op.threadSafe());
 #endif
 
-
-  std::cout << " nbItem " << items << std::endl;
   for (int n=0; n<items; n++)
   {
     const MotionItem& item = it[n];
@@ -336,35 +334,6 @@ void BoxLayoutData<T>::makeItSoLocalCopy(const Interval&   a_srcComps,
 
   }
 }
-
-
-#ifdef DTD
-template<class T>
-void BoxLayoutData<T>::makeItSoLocalCopy_VGPU(const Interval&   a_srcComps,
-                                          const BoxLayoutData<T>& a_src,
-                                          BoxLayoutData<T>& a_dest,
-                                          const Interval&   a_destComps,
-                                          const Copier&     a_copier,
-                                          const LDOperator<T>& a_op) const
-{
-
-  CH_TIME("local copying vGPU");
-  CopyIterator it(a_copier, CopyIterator::LOCAL);
-  int items=it.size();
-  
-  for (int n=0; n<items; n++)
-  {
-    const MotionItem& item = it[n];
-    a_op.op(a_dest[item.toIndex], item.fromRegion,
-            a_destComps,
-            item.toRegion,
-            a_src[item.fromIndex],
-            a_srcComps);
-
-  }
-}
-#endif
-
 
 template<class T>
 void BoxLayoutData<T>::makeItSoEnd(
@@ -626,16 +595,11 @@ void BoxLayoutData<T>::allocateBuffers(const BoxLayoutData<T>& a_src,
       free((m_buff->m_sendbuffer));
       if (s_verbosity > 0) pout()<<"malloc send buffer "<<sendBufferSize<<std::endl;
       
-#ifdef DTD
 #ifdef PROTO_CUDA
       cudaMalloc((void**)&(m_buff->m_sendbuffer) ,sendBufferSize);
 #else
       (m_buff->m_sendbuffer) = malloc(sendBufferSize);
 #endif
-#else      
-      (m_buff->m_sendbuffer) = malloc(sendBufferSize);
-#endif
-
       if ((m_buff->m_sendbuffer) == NULL)
         {
           MayDay::Error("Out of memory in BoxLayoutData::allocatebuffers");
@@ -648,14 +612,10 @@ void BoxLayoutData<T>::allocateBuffers(const BoxLayoutData<T>& a_src,
       free(m_buff->m_recbuffer);
       if (s_verbosity > 0) pout()<<"malloc receive buffer "<<recBufferSize<<std::endl;
 
-#ifdef DTD
 #ifdef PROTO_CUDA
       cudaMalloc( (void**)&( m_buff->m_recbuffer),recBufferSize);
 #else
       m_buff->m_recbuffer = malloc(recBufferSize);
-#endif
-#else
-      m_buff->m_recbuffer = malloc(recBufferSize);	
 #endif
       if (m_buff->m_recbuffer == NULL)
         {

@@ -186,30 +186,16 @@ public:
   virtual void linearOut(const T& arg, void* buf, const Box& R,
                          const Interval& comps) const
   {
-#ifdef DTD
    ::Proto::Box bx = ProtoCh::getProtoBox(R);
    ::Proto::CInterval Ccomps(comps.begin(),comps.end());
    arg.linearOut(buf, bx, Ccomps);
-#else
-    ::Proto::Box bx = ProtoCh::getProtoBox(R);
-     unsigned int start = comps.begin();
-    unsigned int ncomp = comps.size();
-    arg.linearOut(buf, bx, start, ncomp);
-#endif
   }
   virtual void linearIn(T& arg,  void* buf, const Box& R,
                         const Interval& comps)const
   {
-#ifdef DTD
     ::Proto::Box bx = ProtoCh::getProtoBox(R);
     ::Proto::CInterval Ccomps(comps.begin(),comps.end());
     arg.linearIn(buf, bx, Ccomps);
-#else
-    ::Proto::Box bx = ProtoCh::getProtoBox(R);
-    unsigned int start = comps.begin();
-    unsigned int ncomp = comps.size();
-    arg.linearIn(buf, bx, start, ncomp);
-#endif
   }
 
   ///this boolean only has to do with whether the op(...) function is thread safe
@@ -235,12 +221,7 @@ public:
       int isrc = Csrc.begin();
       int idst = Cdest.begin();
       int inco = Csrc.size();
-//      dest.copy(RegionFrom, Cdest,RegionTo, src, Csrc);
       dest.copy(src, bxFr, isrc, bxTo, idst, inco);
-
-#ifdef DTD
-//    std::cout << " marco " << std::endl;
-#endif
     }
     else
     {
@@ -258,11 +239,6 @@ public:
       void* b = (void*)&(buffer[0]);
       linearOut(src, b, RegionFrom, Csrc);
       linearIn(dest, b, RegionTo,   Cdest);
-#ifdef DTD
-//      std::cout << " polo " << std::endl;
-
-#endif
-
     }
   }
 };
@@ -450,7 +426,7 @@ protected:
 
 
   
-public:
+protected:
   void makeItSo(const Interval&     a_srcComps,
                 const BoxLayoutData<T>& a_src,
                 BoxLayoutData<T>&   a_dest,
@@ -472,24 +448,10 @@ public:
                 const Interval&     a_destComps,
                 const Copier&       a_copier,
                 const LDOperator<T>& a_op = LDOperator<T>()) const;
-protected:
 
-#ifdef DTD
-  void makeItSoLocalCopy_VGPU(
-                const Interval&     a_srcComps,
-                const BoxLayoutData<T>& a_src,
-                BoxLayoutData<T>&   a_dest,
-                const Interval&     a_destComps,
-                const Copier&       a_copier,
-                const LDOperator<T>& a_op = LDOperator<T>()) const;
-#endif
-
-public:
   void makeItSoEnd(
                 const Interval&     a_destComps,
                 const LDOperator<T>& a_op = LDOperator<T>());
-protected:
-
 
   //========================================================================
   //
