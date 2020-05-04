@@ -35,7 +35,7 @@ CopierBuffer::~CopierBuffer()
 
 void CopierBuffer::clear()
 {
-#if(defined DTD && defined PROTO_CUDA)
+#ifdef PROTO_CUDA
   if (m_sendbuffer != NULL) cudaFree(m_sendbuffer);
   if (m_recbuffer  != NULL) cudaFree(m_recbuffer);
 #else
