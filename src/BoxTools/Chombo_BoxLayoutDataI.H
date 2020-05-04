@@ -305,6 +305,9 @@ void BoxLayoutData<T>::makeItSoLocalCopy(const Interval&   a_srcComps,
 #ifdef _OPENMP
   bool threadSafe = m_threadSafe && (a_op.threadSafe());
 #endif
+
+
+  std::cout << " nbItem " << items << std::endl;
   for (int n=0; n<items; n++)
   {
     const MotionItem& item = it[n];
