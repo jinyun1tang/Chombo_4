@@ -86,9 +86,6 @@ public:
               const Interval &            a_dstComps,
               const Copier   &            a_copier) 
   {
-  //  LevelData<FArrayBox> hostdataSrc(this->disjointBoxLayout(), NUMCOMPS,  this->m_ghost);
-  //  LevelData<FArrayBox> hostdataDst(a_dst.disjointBoxLayout(), NUMCOMPS, a_dst.ghostVect());
-
     // To check
     if(this->m_ghost > IntVect::Zero)
 	 m_hostSrc.define(this->disjointBoxLayout(), NUMCOMPS, this->m_ghost);
@@ -110,26 +107,12 @@ public:
   virtual void exchange(const Copier& copier)
   {
     CH_TIMERS("LevelBoxData::exchange");
-    CH_TIMER("copyToHost",t1);
     CH_TIMER("exchange",t2);
-    CH_TIMER("copyToDevice",t3);
-    CH_START(t1);
-#ifndef DTD
-    copyToHost(m_host, *this);
-#endif
-    CH_STOP(t1);
+ 
+    // Now, the exchange are performed by BoxData instead of FArray, therefor we don't need to use copy To Host and copy to Device 
     CH_START(t2);
-#ifdef DTD
    this->LevelData<BoxData<Real, NUMCOMPS> >::exchange(copier);
-#else 
-    m_host.exchange(copier);
-#endif
     CH_STOP(t2);
-    CH_START(t3);
-#ifndef DTD
-    copyToDevice(*this, m_host);
-#endif
-    CH_STOP(t3);
   }
     
 
@@ -145,7 +128,7 @@ public:
 #endif
   }
 
-  ///
+  /// This function is no longer used in exchange due to the Gpu to Gpu strategy
   static 
   void copyToHost(LevelData<FArrayBox>                      & a_hostDat,
                   const LevelData<BoxData<Real, NUMCOMPS> > & a_deviDat)
@@ -160,8 +143,6 @@ public:
       const Real* deviPtr = devifab.dataPtr(0);
 
 #ifdef PROTO_CUDA
-      //cudaMemcpy(hostPtr, deviPtr, datSize, cudaMemcpyDeviceToHost);
-      //cudaStreamSynchronize(Proto::DisjointBoxLayout::getCurrentStream());
       cudaDeviceSynchronize();
       cudaMemcpyAsync(hostPtr, deviPtr, datSize, cudaMemcpyDeviceToHost,Proto::DisjointBoxLayout::getCurrentStream());
       cudaError err = cudaGetLastError();
@@ -176,7 +157,7 @@ public:
     }
   }
 
-  ///
+  // This function is no longer used in exchange due to the Gpu to Gpu strategy
   static 
   void copyToDevice(LevelData<BoxData<Real, NUMCOMPS> > & a_deviDat,
                     const LevelData<FArrayBox>          & a_hostDat) 
