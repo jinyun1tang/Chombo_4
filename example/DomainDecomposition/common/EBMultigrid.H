@@ -280,6 +280,7 @@ public:
               const Box                         & a_domain,
               const IntVect                     & a_nghost)
   {
+    pout() << "defining finest multigrid level" << endl;
     m_finest = std::shared_ptr<EBMultigridLevel>(
       new EBMultigridLevel(a_dictionary, 
                            a_geoserv,
@@ -293,6 +294,7 @@ public:
                            a_domain, 
                            a_nghost));
 
+    pout() << "defining internal data" << endl;
     const shared_ptr<LevelData<EBGraph>  > graphs = a_geoserv->getGraphs(a_domain);
     m_res.define(a_grids, a_nghost  , graphs);
     m_cor.define(a_grids, a_nghost  , graphs);

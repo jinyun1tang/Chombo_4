@@ -169,6 +169,7 @@ runTest(int a_argc, char* a_argv[])
   EBLevelBoxData<CELL,   1>  res(grids, dataGhostIV, graphs);
   EBLevelBoxData<CELL,   1>  cor(grids, dataGhostIV, graphs);
 
+  pout() << "defining solver" << endl;
   EBMultigrid solver(dictionary, geoserv, alpha, beta, dx, grids, stenname, dombcname, ebbcname, dombox, dataGhostIV);
   EBMultigrid::s_numSmoothUp   = numSmooth;
   EBMultigrid::s_numSmoothDown = numSmooth;
@@ -184,6 +185,7 @@ runTest(int a_argc, char* a_argv[])
     corbd.setVal(0.0);
   }
 
+  pout() << "solving lphi = rhs " << endl;
   solver.solve(phi, rhs, tol, maxIter, false);
 
   pout() << "writing to file " << endl;

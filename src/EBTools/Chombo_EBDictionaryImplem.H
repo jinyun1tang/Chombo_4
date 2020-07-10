@@ -83,7 +83,7 @@ registerStencil(string a_stencilName,
   shared_ptr< LevelData< XFacData >  > xfadat = m_geoserv->getXFaceData( a_srcDomain);
   shared_ptr< LevelData< YFacData >  > yfadat = m_geoserv->getYFaceData( a_srcDomain);
   shared_ptr< LevelData< ZFacData >  > zfadat = m_geoserv->getZFaceData( a_srcDomain);
-
+  pout() << "going into ebstencil constructors" << endl;
   DataIterator dit = m_grids[dstIndex].dataIterator();
   for(int ibox = 0; ibox < dit.size(); ibox++)
   {

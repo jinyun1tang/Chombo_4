@@ -222,14 +222,17 @@ EBMultigridLevel(dictionary_t                            & a_dictionary,
   m_kappa.define(m_grids, m_nghost, m_graphs);
   m_diagW.define(m_grids, m_nghost, m_graphs);
   
+  pout() << "defining copier" << endl;
   m_exchangeCopier.exchangeDefine(m_grids, m_nghost);
   //register stencil for apply op
   //true is for need the diagonal wweight
+  pout() << "registering stencil" << endl;
   m_dictionary->registerStencil(m_stenname, m_dombcname, m_ebbcname, m_domain, m_domain, true);
 
   m_dictionary->registerStencil(m_neumname, StencilNames::Neumann, StencilNames::Neumann, m_domain, m_domain, true);
 
   //need the volume fraction in a data holder so we can evaluate kappa*alpha I 
+  pout() << "filling kappa " << endl;
   fillKappa(a_geoserv);
 
   defineCoarserObjects(a_geoserv);
@@ -321,6 +324,7 @@ EBMultigridLevel::
 fillKappa(const shared_ptr<GeometryService<2> >   & a_geoserv)
 {
   CH_TIME("EBMultigridLevel::fillkappa");
+  pout() << "entering EBMultigridLevel::fillkappa" << endl;
   DataIterator dit = m_grids.dataIterator();
   int ideb = 0;
   for(int ibox = 0; ibox < dit.size(); ++ibox)
@@ -331,9 +335,12 @@ fillKappa(const shared_ptr<GeometryService<2> >   & a_geoserv)
     const EBGraph  & graph = (*m_graphs)[dit[ibox]];
     EBHostData<CELL, Real, 1> hostdat(grbx, graph);
     //fill kappa on the host then copy to the device
+    pout() << "entering geometryservice::fillkappa" << endl;
     a_geoserv->fillKappa(hostdat, grid, dit[ibox], m_domain);
     // now copy to the device
+    pout() << "entering copyToDevice" << endl;
     EBLevelBoxData<CELL, 1>::copyToDevice(hostdat, kappdat);
+    pout() << "out of copyToDevice" << endl;
 
     shared_ptr<ebstencil_t>                  stencil  = m_dictionary->getEBStencil(m_stenname, m_ebbcname, m_domain, m_domain, ibox);
     shared_ptr< EBBoxData<CELL, Real, 1> >   diagptr  = stencil->getDiagonalWeights();
@@ -346,6 +353,7 @@ fillKappa(const shared_ptr<GeometryService<2> >   & a_geoserv)
     ideb++;
   }
   m_kappa.exchange(m_exchangeCopier);
+  pout() << "leaving EBMultigridLevel::fillkappa" << endl;
 }
 /****/
 void
