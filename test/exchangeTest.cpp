@@ -116,18 +116,17 @@ runTest(int a_argc, char* a_argv[])
   phi.exchange(copier);
 
   for(int ibox = 0; ibox < dit.size(); ibox++)
-    {
+  {
       EBBoxData<CELL, Real, 2>& phibd = phi[dit[ibox]];
       Bx d = phibd.box() & convert(dombox);
       size_t flops=0;
       ebforallInPlace_i(flops, "verifyPhiPt", verifyPhiPt, d, phibd, dx);
+  }
 
-
-    }
-
+  Real dt = dx;
   
- // string fileq("phi.hdf5");
- // writeEBLevelHDF5<1>(  fileq,  phi, kappa, domain.domainBox(), graphs, coveredval, dx, dt, time);
+  string fileq("phi.hdf5");
+  writeEBLevelHDF5<1>(  fileq,  phi, kappa, domain.domainBox(), graphs, -1, dx, dt, time);
   
   return 0;
 }

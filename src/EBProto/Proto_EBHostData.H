@@ -242,8 +242,8 @@ namespace Proto
     EBHostData& operator=(const EBHostData<cent, data_t, ncomp>& a_src);
 
     Box m_inputBox;
-    HostBoxData<        data_t, ncomp>     m_regData;
-    HostIrregData<cent, data_t, ncomp>     m_irrData;
+    BoxData<        data_t, ncomp>     m_regData;
+    IrregData<cent, data_t, ncomp>     m_irrData;
     EBGraph                                m_graph;
   };
 
@@ -253,7 +253,7 @@ namespace Proto
                  const Box& a_grid, unsigned int a_icomp) 
     {
       data_t maxval = 0; 
-      using Proto::BoxIterator;
+   /*   using Proto::BoxIterator;
       for(auto bit = a_grid.begin(); bit != a_grid.end(); ++bit)
       {
         Point pt = *bit;
@@ -268,7 +268,7 @@ namespace Proto
             maxval = absval;
           }
         }
-      }
+      }*/
       return maxval;
     }
 
@@ -278,6 +278,7 @@ namespace Proto
                      const Box& a_grid, unsigned int a_icomp)
   {
     data_t maxval = 0; 
+    /*
     using Proto::BoxIterator;
     for(auto bit = a_grid.begin(); bit != a_grid.end(); ++bit)
     {
@@ -300,7 +301,7 @@ namespace Proto
           }
         }
       }
-    }
+    }*/
     return maxval;
   }
 
