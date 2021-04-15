@@ -5,7 +5,7 @@ CPPFLAGS += -I$(CHOMBO_HOME)/src/BoxTools
 CPPFLAGS += -I$(CHOMBO_HOME)/src/AMRTools
 CPPFLAGS += -DCH_SPACEDIM=$(DIM) -DCH_USE_64 
 CPPFLAGS += -I../../common
-CPPFLAGS += -I$(CHOMBO_HOME)/src/EBTools -I$(CHOMBO_HOME)/src/EBProto
+CPPFLAGS += -I$(CHOMBO_HOME)/src/EBTools -I$(CHOMBO_HOME)/src/EBProto -I$(CHOMBO_HOME)/src/CrunchFlow
 
 
 

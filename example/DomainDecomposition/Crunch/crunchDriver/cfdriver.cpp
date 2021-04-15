@@ -1,16 +1,16 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
-#ifdef MKL
-#include <mkl_lapacke.h>
-#else
-#include <lapacke.h>
-#endif
+//#ifdef MKL
+//#include <mkl_lapacke.h>
+//#else
+//#include <lapacke.h>
+//#endif
 #include <stdlib.h>
 #include "ShapeArray.H"
 #include "crunchflow.h"
 
-using namespace shape;
+//using namespace shape;
 //
 int cfdriver(enum Target target)
 {
@@ -380,16 +380,16 @@ int cfdriver(enum Target target)
 
 int main(int argc, char *argv[])
 {
-  enum Target target = HOST;
+  enum Target target = TARGET_HOST;
   switch(argc)
     {
     case 1:
       break;
     case 2:
       if(!strcmp(argv[1],"host"))
-	target = HOST;
+	target = TARGET_HOST;
       else if(!strcmp(argv[1],"device"))
-	target = DEVICE;
+	target = TARGET_DEVICE;
       else
 	{
 	  fprintf(stderr,"unknown target");

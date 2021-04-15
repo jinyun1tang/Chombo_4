@@ -1,8 +1,9 @@
 #include <stdbool.h>
-
+#ifndef __crunchflow__h__
+#define __crunchflow__h__
 #define DEBUG 0
 
-enum Target {HOST, DEVICE};
+enum Target {TARGET_HOST, TARGET_DEVICE};
 
 #ifndef max
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
@@ -651,3 +652,5 @@ extern Solution *solutions;
 void printSpecies(Species *dependencyList);
 void printMatrix(int m, int n, const double*A, int lda, const char* name);
 void print_matrix(const int n, /* const */ double *A_2d, /* const */ double *b_1d, const char *name);
+
+#endif

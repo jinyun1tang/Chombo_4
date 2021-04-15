@@ -13,11 +13,10 @@
 
 #include <cstddef>
 #include <tuple>
-#include "IntVect.H"
+#include "Chombo_IntVect.H"
 
-#include "NamespaceHeader.H"
+#include "Chombo_NamespaceHeader.H"
 
-#if CXXSTD>=14
 namespace shape
 {
 
@@ -336,8 +335,7 @@ inline auto make_MD_array(T* a_data, Is... a_lens) noexcept
 }
 
 }  // namespace shape
-#endif
 
-#include "NamespaceFooter.H"
+#include "Chombo_NamespaceFooter.H"
 
 #endif  /* ! defined _SHAPEARRAY_H_ */

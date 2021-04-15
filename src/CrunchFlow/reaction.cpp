@@ -20,7 +20,7 @@
 #include "ShapeArray.H"
 #include "crunchflow.h"
 
-using namespace shape;
+//using namespace shape;
 
 void reaction(const int ncomp,
 	      const int neqn, 
@@ -59,6 +59,7 @@ void reaction(const int ncomp,
 	      double *mumin_3d, // [ncomp][nkin][MAX_PATH],
 	      /* const */ double *keqmin_5d) // [nz][ny][nx][nkin][MAX_PATH])
 {
+  using Chombo4::shape::ShapeArray;
   ShapeArray<double, 2> snorm(snorm_2d, nkin, MAX_PATH);
   ShapeArray<double, 4> dppt(dppt_4d, nz, ny, nx, nkin);
   ShapeArray<double, 4> u_rate(u_rate_4d, nz, ny, nx, nkin);
