@@ -459,7 +459,7 @@ int os3d_newton(enum Target target,
 
 #ifdef PROTO_CUDA
 
-      if(target == DEVICE)
+      if(target == TARGET_DEVICE)
 	{
 
       int info = 0;       /* host copy of error info */
@@ -785,7 +785,7 @@ int os3d_newton(enum Target target,
   free(rdkin);
   free(decay_correct);
 
-  if(target == HOST)
+  if(target == TARGET_HOST)
     fprintf(stderr,"os3d_newton: LU host solver: %.0f ns\n", total_time_taken);
 
   return *icvg;
