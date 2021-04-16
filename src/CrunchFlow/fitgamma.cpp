@@ -1,11 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef MKL
-#include <mkl_lapacke.h>
-#else
 #include <lapacke.h>
-#endif
 #include "ShapeArray.H"
 #include "crunchflow.h"
 

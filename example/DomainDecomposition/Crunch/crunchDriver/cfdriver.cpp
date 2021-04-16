@@ -296,7 +296,8 @@ int cfdriver(enum Target target)
     }
   };
 
-  return( os3d_newton(/* enum Target */ target,
+  return(Crunch::
+         os3d_newton(/* enum Target */ target,
 		      /* const int */ ncomp,
 		      /* const int */ nspec,
 		      /* const int */ nkin,
