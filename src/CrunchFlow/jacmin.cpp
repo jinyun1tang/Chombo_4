@@ -115,23 +115,23 @@ void jacmin(const int ncomp,
 
 	    sppTMP[i-1] = sppTMP[i-1] + PERTURB;
 
-	    termTMP = affinitynumerical(ncomp, 
-					jx, 
-					jy, 
-					jz, 
-					nx, 
-					ny,
-					nz,
-					np, 
-					nkin, 
-					nspec,
-					loopNP, 
-					k, 
-					sppTMP_1d,
-					gam_4d, 
-					mumin_3d, 
-					keqmin_5d, 
-					AffinityDepend1_2d);
+	    termTMP = Crunch::affinitynumerical(ncomp, 
+                                                jx, 
+                                                jy, 
+                                                jz, 
+                                                nx, 
+                                                ny,
+                                                nz,
+                                                np, 
+                                                nkin, 
+                                                nspec,
+                                                loopNP, 
+                                                k, 
+                                                sppTMP_1d,
+                                                gam_4d, 
+                                                mumin_3d, 
+                                                keqmin_5d, 
+                                                AffinityDepend1_2d);
 
 	    jac_sat[i-1] = (termTMP - affinityTerm)/PERTURB;
 	    sppTMP[i-1] = sppTMP[i-1] - PERTURB;

@@ -251,7 +251,7 @@ int os3d_newton(enum Target target,
 
       if(igamma == 2) 
 	{
-	  cfgamma(ncomp,
+          Crunch::cfgamma(ncomp,
 		  nspec,
 		  ntemp,
 		  jx,
@@ -275,7 +275,7 @@ int os3d_newton(enum Target target,
 		  gam_4d);
 	}
   
-      specieslocal(ncomp,
+      Crunch::specieslocal(ncomp,
 		   nspec,
 		   jx,
 		   jy,
@@ -289,7 +289,7 @@ int os3d_newton(enum Target target,
 		   sp10_4d,
 		   keqaq_4d);
   
-      totconc(ncomp,
+      Crunch::totconc(ncomp,
 	      nspec,
 	      neqn,
 	      jx,
@@ -302,7 +302,7 @@ int os3d_newton(enum Target target,
 	      sp10_4d,
 	      s_4d);
 
-      jac_local(ncomp,
+      Crunch::jac_local(ncomp,
 		nspec,
 		neqn,
 		jx,
@@ -315,7 +315,7 @@ int os3d_newton(enum Target target,
 		muaq_2d,
 		sp10_4d);
   
-      reaction(ncomp,
+      Crunch::reaction(ncomp,
 	       neqn,
 	       nkin,
 	       nspec,
@@ -352,7 +352,7 @@ int os3d_newton(enum Target target,
 	       mumin_3d,
 	       keqmin_5d);
        
-      jacmin(ncomp,
+      Crunch::jacmin(ncomp,
 	     nspec,
 	     nkin,
 	     neqn,
@@ -387,7 +387,7 @@ int os3d_newton(enum Target target,
 	     keqmin_5d,
 	     s_4d);
        
-      fx_local(ncomp,
+      Crunch::fx_local(ncomp,
 	       neqn,
 	       delt,
 	       jx,
@@ -409,7 +409,7 @@ int os3d_newton(enum Target target,
 	       fxmax_1d,
 	       satliq_3d);
       
-      assemble_local(target,
+      Crunch::assemble_local(target,
 		     ncomp, 
 		     nspec, 
 		     nkin, 
@@ -667,7 +667,7 @@ int os3d_newton(enum Target target,
 	}
 #endif
 
-      if( target == HOST)
+      if( target == TARGET_HOST)
 	{
       auto start = std::chrono::high_resolution_clock::now();
       
