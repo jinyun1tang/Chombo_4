@@ -3,7 +3,8 @@
 
 using namespace shape;
 
-void totconc(const int ncomp, 
+void
+Crunch::totconc(const int ncomp, 
 	     const int nspec, 
 	     const int neqn,
 	     const int jx, 

@@ -22,7 +22,8 @@
 
 //using namespace shape;
 
-void reaction(const int ncomp,
+void
+Crunch::reaction(const int ncomp,
 	      const int neqn, 
 	      const int nkin, 
 	      const int nspec, 

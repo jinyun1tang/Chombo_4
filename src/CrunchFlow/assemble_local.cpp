@@ -238,7 +238,8 @@ __global__ void assemble_local_kernel(double* aaa, // [neqn][neqn]
 }
 #endif
   
-void assemble_local(enum Target target,
+void
+Crunch::assemble_local(enum Target target,
 		    const int ncomp, 
 		    const int nspec, 
 		    const int nkin, 

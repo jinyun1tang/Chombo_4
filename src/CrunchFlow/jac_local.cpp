@@ -22,7 +22,8 @@
 
 using namespace shape;
 
-void jac_local(const int ncomp, 
+void
+Crunch::jac_local(const int ncomp, 
 	       const int nspec, 
 	       const int neqn,
 	       const int jx, 

@@ -4,7 +4,8 @@
 
 using namespace shape;
 
-void fx_local(const int ncomp,
+void
+Crunch::fx_local(const int ncomp,
 	      const int neqn,
 	      const double dt, 
 	      const int jx, 

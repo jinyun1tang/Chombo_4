@@ -5,7 +5,8 @@
 
 using namespace shape;
 
-void cfgamma(const int ncomp, 
+void
+Crunch::cfgamma(const int ncomp, 
 	     const int nspec,
 	     const int ntemp,
 	     const int jx, 

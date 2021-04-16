@@ -6,7 +6,8 @@
 
 using namespace shape;
 
-void jacmin(const int ncomp, 
+void
+Crunch::jacmin(const int ncomp, 
 	    const int nspec, 
 	    const int nkin, 
 	    const int neqn, 

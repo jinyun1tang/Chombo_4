@@ -4,7 +4,8 @@
  
 using namespace shape;
 
-double affinitynumerical(const int ncomp, 
+double
+Crunch::affinitynumerical(const int ncomp, 
 			 const int jx, 
 			 const int jy, 
 			 const int jz, 

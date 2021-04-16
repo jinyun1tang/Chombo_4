@@ -5,7 +5,8 @@
 
 using namespace shape;
 
-void specieslocal(const int ncomp, 
+void
+Crunch::specieslocal(const int ncomp, 
 		  const int nspec, 
 		  const int jx, 
 		  const int jy, 
