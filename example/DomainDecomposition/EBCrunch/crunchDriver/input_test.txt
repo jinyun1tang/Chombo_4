@@ -1,0 +1,215 @@
+! calcite dissolution input
+! Lili et al 2008 GCA
+! 4000 micron-long, 500 micron-diameter cylinder (figure 3)
+! average vel = 0.04 cm/s for flow 9.39 uL/min
+! average vel = 0.08 cm/s for flow 4.72 uL/min
+!
+! added tracer, changed equilibrium cnst (-8.2342) --  May 2015 Sergi
+
+&dimensions
+  ncomp = 6
+  nspec = 9
+  nkin  = 1
+/
+
+&debye_huckel
+  a_dh  = 0.5114
+  b_dh  = 0.3288
+  b_dot = 0.0410
+/
+
+&component
+  name    = 'H+'
+  a_zero  = 9.0
+  charge  = 1.0
+  molecular_weight = 1.0079
+/
+
+&component
+  name    = 'CO2(aq)'
+  a_zero  = 3.0
+  charge  = 0.0
+  molecular_weight = 44.0098 
+/
+
+&component
+  name    = 'Ca++'
+  a_zero  = 6.0
+  charge  = 2.0
+  molecular_weight = 40.0780  
+/
+
+&component
+  name    = 'Na+'
+  a_zero  = 4.0
+  charge  = 1.0 
+  molecular_weight = 22.9898
+/
+
+&component
+  name    = 'Cl-'
+  a_zero  =  3.0 
+  charge  = -1.0
+  molecular_weight = 35.4527 
+/
+
+&component
+  name    = 'Tracer'
+  a_zero  =  1.0 
+  charge  =  0.0
+  molecular_weight = 1.0
+/
+
+&aqueous_complex
+  name             = 'OH-'
+  stoichiometry    = -1.0 'H+' !!  1.0 'H2O'
+  keq              = 13.9951
+  a_zero           = 3.5 
+  charge           = -1.0
+  molecular_weight = 17.0073
+/
+
+&aqueous_complex
+  name             = 'HCO3-'
+  stoichiometry    = -1.0 'H+'   1.0 'CO2(aq)'
+  keq              = 6.34143
+  a_zero           = 4.0
+  charge           = -1.0
+  molecular_weight = 61.0171
+/
+
+&aqueous_complex
+  name             = 'CO3--'
+  stoichiometry    = -2.0 'H+'  1.0 'CO2(aq)'
+  keq              = 15.959
+  a_zero           = 4.5
+  charge           = -2.0
+  molecular_weight = 60.0092
+/
+
+&aqueous_complex
+  name             = 'CaCO3(aq)'
+  stoichiometry    = -2.0 'H+'  1.0 'CO2(aq)'  1.0 'Ca++' 
+  keq              = 13.3502
+  a_zero           = 3.0
+  charge           = 0.0
+  molecular_weight = 100.0872
+/
+
+&aqueous_complex
+  name             = 'CaHCO3+'
+  stoichiometry    = -1.0 'H+'  1.0 'CO2(aq)'  1.0 'Ca++'
+  keq              = 5.29856
+  a_zero           = 4.0
+  charge           = 1.0
+  molecular_weight = 101.0951
+/
+
+&aqueous_complex
+  name             = 'CaOH+'
+  stoichiometry    = -1.0 'H+'  1.0 'Ca++'
+  keq              = 12.85
+  a_zero           = 4.0
+  charge           = 1.0
+  molecular_weight = 57.0853
+/
+
+&aqueous_complex
+  name             = 'HCl(aq)'
+  stoichiometry    = 1.0 'H+'  1.0 'Cl-'
+  keq              = -0.69993
+  a_zero           = 3.0
+  charge           = 0.0
+  molecular_weight = 36.4606
+/
+
+&aqueous_complex
+  name             = 'CaCl+'
+  stoichiometry    = 1.0 'Ca++'  1.0 'Cl-'
+  keq              = 0.70039
+  a_zero           = 4.0
+  charge           = 1.0
+  molecular_weight = 75.5307
+/
+
+&aqueous_complex
+  name             = 'CaCl2(aq)'
+  stoichiometry    = 1.0 'Ca++'  2.0 'Cl-'
+  keq              = 0.65346
+  a_zero           = 3.0
+  charge           = 0.0
+  molecular_weight = 110.9834
+/
+
+&mineral_reaction
+  name             = 'Calcite'
+  stoichiometry    = 1.0 'Ca++'  -2.0 'H+'  1.0 'CO2(aq)'
+  keq              = -7.4786
+  molar_volume     = 36.9340d0
+  molecular_weight = 100.0872
+  read_kinetics    = true
+/
+
+&pathway
+  name       = 'Calcite'
+  label      = 'leichou1'
+  type       = 'tst'
+  rate       = -0.05
+  activation_energy = 15.0  ! kcal/mole
+  dependence = 'H+' 1.0
+/
+
+&pathway
+  name       = 'Calcite'
+  label      = 'leichou2'
+  type       = 'tst'
+  rate       = -3.30
+  activation_energy = 15.0  ! kcal/mole
+  dependence = 'CO2(aq)' 1.0
+/
+
+&pathway 
+  name       = 'Calcite'
+  label      = 'leichou3'
+  type       = 'tst'
+  rate       = -6.18
+  activation_energy = 0.0  ! kcal/mole
+/ 
+
+&solution
+  name = 'inlet'
+  c    = 'H+'            1.094E-05
+         'CO2(aq)'       1.070E-05
+         'Ca++'          1.543E-30
+         'Na+'           1.000E-02
+         'Cl-'           1.001E-02
+         'Tracer'        1.000E-02
+         'HCO3-'         5.418E-07
+         'CaOH+'         1.633E-38
+         'HCl(aq)'       4.501E-07
+         'OH-'           1.133E-09
+         'CO3--'         1.776E-11
+         'CaCO3(aq)'     4.984E-39
+         'CaHCO3+'       6.236E-36
+         'CaCl+'         2.075E-33
+         'CaCl2(aq)'     1.873E-35 
+/
+
+&solution
+  name = 'initial'
+  c    = 'H+'            1.094E-05
+         'CO2(aq)'       1.070E-05
+         'Ca++'          1.543E-30
+         'Na+'           1.000E-02
+         'Cl-'           1.001E-02
+         'Tracer'        1.000E-10
+         'HCO3-'         5.418E-07
+         'CaOH+'         1.633E-38
+         'HCl(aq)'       4.501E-07
+         'OH-'           1.133E-09
+         'CO3--'         1.776E-11
+         'CaCO3(aq)'     4.984E-39
+         'CaHCO3+'       6.236E-36
+         'CaCl+'         2.075E-33
+         'CaCl2(aq)'     1.873E-35 
+/
