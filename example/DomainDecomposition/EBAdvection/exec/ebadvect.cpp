@@ -18,7 +18,7 @@
 #include "Chombo_EBChombo.H"
 #include "EBAdvection.H"
 #include "SetupFunctions.H"
-
+#include "Chombo_Attach.H"
 #include <iomanip>
 
 #define MAX_ORDER 2
@@ -434,6 +434,7 @@ int main(int a_argc, char* a_argv[])
   MPI_Init(&a_argc, &a_argv);
   pout() << "MPI INIT called" << std::endl;
 #endif
+  Chombo4::registerDebugger();
   //needs to be called after MPI_Init
   CH_TIMER_SETFILE("ebadvect.time.table");
   {
