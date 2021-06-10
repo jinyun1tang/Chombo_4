@@ -709,9 +709,9 @@ protected:
   
 };
 #include "Chombo_NamespaceFooter.H"
-using Chombo4::IntVect;
-namespace std { template <> inline constexpr bool less<IntVect>::operator()(const IntVect& a, const IntVect& b) const { return a.lexLT(b);}
-}
+//using Chombo4::IntVect;
+//namespace std { template <> inline constexpr bool less<IntVect>::operator()(const IntVect& a, const IntVect& b) const { return (a <b) ;}
+//}
 //#include "Chombo_NamespaceVar.H"
 
 ///functions for linearization
