@@ -556,7 +556,7 @@ namespace hoeb
     volmom.shift(distance);
 
     
-    LAPACKMatrix Qmat(1, IndexedMoments<DIM-1, HOEB_MAX_ORDER>::size());
+    LAPACKMatrix Qmat(1, IndexedMoments<DIM, HOEB_MAX_ORDER>::size());
 
     for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
     {
