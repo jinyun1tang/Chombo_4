@@ -160,8 +160,9 @@ runTest()
   int maxGrid = 32;
     
   ParmParse pp;
-
+  int nghost;
   pp.get("nx"        , nx);
+  pp.get("num_ghost_cells"        , nghost);
   pp.get("maxGrid"  , maxGrid);
   pp.get("coveredval", coveredval);         
 
@@ -183,9 +184,9 @@ runTest()
   Chombo4::DisjointBoxLayout gridsFine = vecgrids[0];
   Chombo4::DisjointBoxLayout gridsMedi = vecgrids[1];
   Chombo4::DisjointBoxLayout gridsCoar = vecgrids[2];
-  IntVect dataGhostIV =   4*IntVect::Unit;
+  IntVect dataGhostIV =   nghost*IntVect::Unit;
   Point   dataGhostPt = ProtoCh::getPoint(dataGhostIV); 
-  int geomGhost = 4;
+  int geomGhost = 6;
   RealVect origin = RealVect::Zero();
   
   shared_ptr<BaseIF>    impfunc = hoeb::getImplicitFunction();

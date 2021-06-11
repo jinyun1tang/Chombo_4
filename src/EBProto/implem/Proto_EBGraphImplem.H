@@ -1275,6 +1275,13 @@ namespace Proto
 /*******************************/
   vector< EBIndex<CELL> > EBGraph::getVoFs(const Point& a_iv) const
   {
+    // begin debug    
+    int ideb = 0;
+    if((!isDefined()) ||(!(m_region.contains(a_iv))))
+    {
+      ideb = 1;
+    }
+    //end debug
     PR_assert(isDefined());
     PR_assert(m_region.contains(a_iv));
 

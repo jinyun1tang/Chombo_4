@@ -121,6 +121,11 @@ LAPACKMatrix::
 int 
 LAPACKMatrix::offset(int a_irow, int a_icol) const
 {
+  int ideb = 0;
+  if((!((a_irow >= 0) && (a_irow < m_nrow)) )  || (!((a_icol >= 0) && (a_icol < m_ncol))))
+  {
+    ideb = 1;
+  }
   CH_assert((a_irow >= 0) && (a_irow < m_nrow));
   CH_assert((a_icol >= 0) && (a_icol < m_ncol));
 
@@ -416,10 +421,13 @@ invert()
 
   HOEB_LAPACK(GETRF,getrf)(&N,&N,A,&N,IPIV,&INFO);
   HOEB_LAPACK(GETRI,getri)(&N,A,&N,IPIV,WORK,&LWORK,&INFO);
-  if(INFO != 0)
+  //only want this printed once
+  static bool printed= false;
+  if(!printed && (INFO != 0))
     {
       MayDay::Warning(" info flag from lapack");
       pout() << PRECCHAR << "getri matrix may be singular---info = " << INFO << endl;
+      printed = true;
     }
   else if(s_checkConditionNumber)
     {
@@ -581,8 +589,10 @@ pseudoInvertUsingQR()
   int INFO;
   HOEB_LAPACK(GEQRF,geqrf)(&M, &N, dataPtr(), &M,
                TAU.dataPtr(), WORK.dataPtr(), &LWORK, &INFO);
-  if (INFO != 0)
+  static bool printed= false;
+  if(!printed && (INFO != 0))
     {
+      printed = true;
       MayDay::Warning(" info flag from lapack");
       pout() << PRECCHAR << "geqrf call has bad value at argument " << (-INFO) << endl;
     }
@@ -596,8 +606,10 @@ pseudoInvertUsingQR()
   // Generate the M by N matrix Q, and store it in Xt.
   HOEB_LAPACK(ORGQR,orgqr)(&M, &N, &N, Xt.dataPtr(),
                &M, TAU.dataPtr(), WORK.dataPtr(), &LWORK, &INFO);
-  if (INFO != 0)
+  static bool printed2= false;
+  if(!printed2 && (INFO != 0))
     {
+      printed2 = true;
       MayDay::Warning(" info flag from lapack");
       pout() << PRECCHAR << "orgqr call has bad value at argument " << (-INFO) << endl;
     }
@@ -917,8 +929,10 @@ int solveLSTSVDOnce(LAPACKMatrix& A, LAPACKMatrix& B)
     }
   resid = sqrt(resid);
   Real tol = 1e-3;
-  if (resid > tol)
+  static bool printed = false;
+  if (!printed && (resid > tol))
     {
+      printed = true;
       pout() << "solveLSTSVD residual = " << resid << endl;
       pout() << "WARNING: solveLSTSVD residual above tolerance " << tol << endl;
       for (int i=0; i < N; ++i)
@@ -1052,8 +1066,10 @@ int solveLSTSVDOnce(LAPACKMatrix      & X,
      }
 
 
-  if(INFO != 0)
+  bool printed3 = false;
+  if(!printed3 && (INFO != 0))
     {
+      printed3 = true;
       MayDay::Warning(" info flag from lapack");
       pout() << PRECCHAR << "gelsd matrix may be singular---info = " << INFO << endl;
       return INFO;
@@ -1136,8 +1152,10 @@ int solveEqualityConstrainedLS(LAPACKMatrix& A, LAPACKMatrix& c, LAPACKMatrix& B
   HOEB_LAPACK(GGLSE,gglse)(&M, &N, &P, A.dataPtr(), &LDA, B.dataPtr(), &LDB, 
           c.dataPtr(), d.dataPtr(), x.dataPtr(), work.dataPtr(), &lwork, &info);
   int INFO = info;
-  if(INFO != 0)
+  static bool printed4 = false;
+  if(!printed4 && (INFO != 0))
     {
+      printed4 = true;
       MayDay::Warning(" info flag from lapack");
       pout() << PRECCHAR << "gglse matrix may be singular---info = " << INFO << endl;
       return INFO;
@@ -1156,8 +1174,10 @@ int solveEqualityConstrainedLS(LAPACKMatrix& A, LAPACKMatrix& c, LAPACKMatrix& B
     }
   resid = sqrt(resid);
   Real tol = 1e-3;
-  if (resid > tol)
+  static bool printed5 = false;
+  if(!printed5 && (INFO != 0))
     {
+      printed5 = true;
       pout() << "solveequalityconstrainedLS residual = " << resid << endl;
       pout() << "WARNING: solveLSTSVD residual above tolerance " << tol << endl;
     }

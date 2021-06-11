@@ -191,7 +191,7 @@ namespace hoeb
       {
         auto vofs = a_graph.getVoFs(*bit);
         //first do the volumes
-        retval.m_volumes.insert(neighvofs.end(), vofs.begin(), vofs.end());
+        retval.m_volumes.insert(retval.m_volumes.end(), vofs.begin(), vofs.end());
           
         //now we do the EBBC
         for(int ivof = 0; ivof < vofs.size(); ivof++)
