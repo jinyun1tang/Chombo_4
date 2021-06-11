@@ -176,7 +176,7 @@ namespace hoeb
       Bx neibx = ptbx.grow(radius);
 
       neibx &= a_graph.getDomain();
-      auto neighvofs = retval.m_volumes;
+
       std::set<EBIndex<XFACE> > xfacesetDiri;
       std::set<EBIndex<XFACE> > xfacesetNeum;
       std::set<EBIndex<YFACE> > yfacesetDiri;
@@ -186,12 +186,12 @@ namespace hoeb
       std::set<EBIndex<ZFACE> > zfacesetneum;
 #endif        
         
-      neighvofs.clear();
+      retval.m_volumes.clear();
       for(auto bit = neibx.begin(); bit != neibx.end(); ++bit)
       {
         auto vofs = a_graph.getVoFs(*bit);
         //first do the volumes
-        neighvofs.insert(neighvofs.end(), vofs.begin(), vofs.end());
+        retval.m_volumes.insert(neighvofs.end(), vofs.begin(), vofs.end());
           
         //now we do the EBBC
         for(int ivof = 0; ivof < vofs.size(); ivof++)
