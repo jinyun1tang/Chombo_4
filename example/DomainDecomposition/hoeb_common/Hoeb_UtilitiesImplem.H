@@ -513,7 +513,9 @@ namespace hoeb
 
     LAPACKMatrix retval;
     multiply(retval, MT, a_M);
-    retval.invert();
+    int maxiter = 100;
+    Real tol = 1.0e-16;
+    retval.invertUsingSVD(maxiter, tol);
     return retval;
   }
   ///
