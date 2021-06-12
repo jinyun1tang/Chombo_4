@@ -36,12 +36,12 @@ getKappaLphi(EBLevelBoxData<CELL, 1>                                            
              const shared_ptr< GeometryService<HOEB_MAX_ORDER> >                &  a_geoserv)
 {
 
+  string stencilName;
+  string ebbcName;
   Chombo4::DataIterator dit = a_grids.dataIterator();
   //register it for every box
   for(unsigned int ibox = 0; ibox < dit.size(); ++ibox)
   {
-    string stencilName;
-    string ebbcName;
     vector<     EBIndex<CELL>  >          dstVoFs;
     vector<LocalStencil<CELL, Real> >     stencil;
     Proto::Box                            srcValid;

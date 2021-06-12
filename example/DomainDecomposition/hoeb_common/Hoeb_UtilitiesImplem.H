@@ -628,7 +628,7 @@ namespace hoeb
     {
       const auto& vof = a_block.m_volumes[ivol];
       //this depends upon the volumes being the first bits
-      Real wgt = a_stenmat(ivol, 0);
+      Real wgt = a_stenmat(0, ivol);
       retval.add(vof, wgt);
     }
 

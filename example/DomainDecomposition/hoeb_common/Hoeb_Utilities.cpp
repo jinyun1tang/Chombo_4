@@ -86,6 +86,12 @@ namespace hoeb
       cellvolinv /= a_dx;
     }
     vofsten *= cellvolinv;
+
+    // set diagonal weight of the stencil so we have the choice of using multigrid
+    Real diagweight;
+    bool foundVoF = vofsten.getValueAtVoF(diagweight, a_vof);
+    PR_assert(foundVoF); //if this fails, the stencil has no diagonal value
+    vofsten.setBetaWeight(diagweight);
     
     return vofsten;
   }
