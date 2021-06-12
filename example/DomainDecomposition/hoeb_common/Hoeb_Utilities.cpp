@@ -230,6 +230,7 @@ namespace hoeb
         {
           auto& vof = vofs[ivof];
           Real phival = phigen(graph, a_dx, voldat, vof);
+          hostdata[dit[ibox]](vof, 0) = phival;
         }
       }
     }
