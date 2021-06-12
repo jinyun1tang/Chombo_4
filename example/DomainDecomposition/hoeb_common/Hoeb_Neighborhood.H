@@ -113,7 +113,7 @@ namespace hoeb
       sqval += dist*dist;
     }
     Real retval = sqrt(sqval);
-    retval = std::min(retval, 0.5);
+    retval = std::max(retval, 0.5);
     return retval;
   }
   //done as dx=1
