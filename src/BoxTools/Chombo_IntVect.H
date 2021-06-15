@@ -711,11 +711,15 @@ protected:
 #include "Chombo_NamespaceFooter.H"
 using Chombo4::IntVect;
 
-namespace std { template <> inline bool less<IntVect>::operator()(const IntVect& a, const IntVect& b) const
+namespace std
 {
-  return a.lexLT(b);}
+  template <>
+  inline bool less<IntVect>::operator()(const IntVect& a, const IntVect& b) const
+  {
+    return a.lexLT(b);
+  }
 }
-//#include "Chombo_NamespaceVar.H"
+
 
 ///functions for linearization
 namespace CH4_SPMD
