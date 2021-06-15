@@ -25,9 +25,10 @@
 
 
 /****/
+//phi not const because of exchange
 void
 getKappaLphi(EBLevelBoxData<CELL, 1>                                            &  a_klp,
-             const EBLevelBoxData<CELL, 1>                                      &  a_phi,
+             EBLevelBoxData<CELL, 1>                                            &  a_phi,
              const shared_ptr<LevelData<EBGraph> >                              &  a_graphs,
              const Chombo4::DisjointBoxLayout                                   &  a_grids,
              const Chombo4::Box                                                 &  a_domain,
@@ -39,6 +40,9 @@ getKappaLphi(EBLevelBoxData<CELL, 1>                                            
   string stencilName;
   string ebbcName;
   Chombo4::DataIterator dit = a_grids.dataIterator();
+  Chombo4::Copier exchangeCopier;
+  exchangeCopier.exchangeDefine(a_grids, a_phi.ghostVect());
+  a_phi.exchange(exchangeCopier);
   //register it for every box
   for(unsigned int ibox = 0; ibox < dit.size(); ++ibox)
   {
@@ -115,7 +119,8 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
               const Chombo4::Box                                                  &  a_domCoar,
               const Real                                                          &  a_dxCoar,
               const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >   &  a_dictionary,
-              const shared_ptr< GeometryService<HOEB_MAX_ORDER> >                 &  a_geoserv)
+              const shared_ptr< GeometryService<HOEB_MAX_ORDER> >                 &  a_geoserv,
+              int a_nxlev)
 {
   ParmParse pp;
   int nghost;
@@ -149,6 +154,20 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
     auto  validbx = (*a_graphsCoar)[dit[ibox]].validBox();
     ebforall(inputbx, subtractionTraction, validbx, errfab, ftocfab, coarfab);
   }
+
+  string phiFineName = string("phiFine_") + to_string(a_nxlev) + string(".hdf5");
+  string phiCoarName = string("phiCoar_") + to_string(a_nxlev) + string(".hdf5");
+  string klpFineName = string("klpFine_") + to_string(a_nxlev) + string(".hdf5");
+  string klpCoarName = string("klpCoar_") + to_string(a_nxlev) + string(".hdf5");
+  string klpFtoCName = string("klpFtoC_") + to_string(a_nxlev) + string(".hdf5");
+  string errCoarName = string("errCoar_") + to_string(a_nxlev) + string(".hdf5");
+  Real coveredVal = 0;
+  phiFine.writeToFileHDF5(  phiFineName, coveredVal);
+  phiCoar.writeToFileHDF5(  phiCoarName, coveredVal);
+  klpFine.writeToFileHDF5(  klpFineName, coveredVal);
+  klpCoar.writeToFileHDF5(  klpCoarName, coveredVal);
+  klpFtoC.writeToFileHDF5(  klpFtoCName, coveredVal);
+  a_errCoar.writeToFileHDF5(errCoarName, coveredVal);
 }
 
 /****/
@@ -231,12 +250,12 @@ runTest()
   getKLPhiError(errMedi, 
                 graphsFine, gridsFine, domFine, dxFine,
                 graphsMedi, gridsMedi, domMedi, dxMedi,
-                dictionary, geoserv);
+                dictionary, geoserv, nx);
 
   getKLPhiError(errCoar, 
                 graphsMedi, gridsMedi, domMedi, dxMedi,
                 graphsCoar, gridsCoar, domCoar, dxCoar,
-                dictionary, geoserv);
+                dictionary, geoserv, nx/2);
 
 
   //Norm!
