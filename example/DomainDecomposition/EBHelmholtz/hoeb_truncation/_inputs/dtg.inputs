@@ -17,3 +17,8 @@ default_neighbor_radius = 3
 maximum_neighbor_radius = 4
 domainBC     = Dirichlet
 EBBC         = Dirichlet
+# can be SineSphere, CosineSphere, Monomial
+which_phi = Polynomial
+polynomial_num_terms = 3
+polynomial_coefficients = 1. 0. 0.
+polynomial_powers = 2 0 0

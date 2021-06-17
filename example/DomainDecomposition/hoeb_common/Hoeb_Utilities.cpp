@@ -204,43 +204,118 @@ namespace hoeb
     typedef HostIrregData<CELL,      IndMomDIM , 1>  VoluData;
     typedef GraphConstructorFactory<EBHostData<CELL, Real, 1> > hostfactory_t;
     
+    LevelData<EBHostData<CELL, Real, 1> > hostdata
+      (a_grids, 1,  a_phi.ghostVect(), hostfactory_t(a_graphs));
+    
     RealVect center = 0.5*RealVect::Unit();
     Real radius = 0.1;
     bool inside = false;
     ParmParse pp;
-    std::vector<Real> centvec;
-    pp.get("radius", radius);
-    pp.get("inside", inside);
-    pp.getarr("center", centvec, 0, DIM);
-    for(int idir = 0; idir < DIM; idir++)
+    string which_phi;
+    pp.get("which_phi", whichphi);
+    if(which_phi  == string("SineSphere"))
     {
-      center[idir] = centvec[idir];
-    }
-    hoeb::SineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
-
-    LevelData<EBHostData<CELL, Real, 1> > hostdata
-      (a_grids, 1,  a_phi.ghostVect(), hostfactory_t(a_graphs));
-    
-    auto voldatldptr = a_geoserv->getVoluData(a_domain);
-    const auto& voldatld = *voldatldptr;
-    Chombo4::DataIterator dit = a_grids.dataIterator();
-    for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
-    {
-      const auto& graph  = (*a_graphs)[dit[ibox]];
-      const auto& voldat = voldatld[dit[ibox]];
-      Bx validbx = graph.validBox();
-      for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
+      std::vector<Real> centvec;
+      pp.get("radius", radius);
+      pp.get("inside", inside);
+      pp.getarr("center", centvec, 0, DIM);
+      for(int idir = 0; idir < DIM; idir++)
       {
-        auto vofs= graph.getVoFs(*bit);
-        for(int ivof = 0; ivof < vofs.size(); ++ivof)
+        center[idir] = centvec[idir];
+      }
+      hoeb::SineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
+
+    
+      auto voldatldptr = a_geoserv->getVoluData(a_domain);
+      const auto& voldatld = *voldatldptr;
+      Chombo4::DataIterator dit = a_grids.dataIterator();
+      for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
+      {
+        const auto& graph  = (*a_graphs)[dit[ibox]];
+        const auto& voldat = voldatld[dit[ibox]];
+        Bx validbx = graph.validBox();
+        for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
         {
-          auto& vof = vofs[ivof];
-          Real phival = phigen(graph, a_dx, voldat, vof);
-          hostdata[dit[ibox]](vof, 0) = phival;
+          auto vofs= graph.getVoFs(*bit);
+          for(int ivof = 0; ivof < vofs.size(); ++ivof)
+          {
+            auto& vof = vofs[ivof];
+            Real phival = phigen(graph, a_dx, voldat, vof);
+            hostdata[dit[ibox]](vof, 0) = phival;
+          }
         }
       }
     }
+    else if(which_phi  == string("CosineSphere"))
+    {
+      std::vector<Real> centvec;
+      pp.get("radius", radius);
+      pp.get("inside", inside);
+      pp.getarr("center", centvec, 0, DIM);
+      for(int idir = 0; idir < DIM; idir++)
+      {
+        center[idir] = centvec[idir];
+      }
+      hoeb::CosineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
 
+    
+      auto voldatldptr = a_geoserv->getVoluData(a_domain);
+      const auto& voldatld = *voldatldptr;
+      Chombo4::DataIterator dit = a_grids.dataIterator();
+      for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
+      {
+        const auto& graph  = (*a_graphs)[dit[ibox]];
+        const auto& voldat = voldatld[dit[ibox]];
+        Bx validbx = graph.validBox();
+        for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
+        {
+          auto vofs= graph.getVoFs(*bit);
+          for(int ivof = 0; ivof < vofs.size(); ++ivof)
+          {
+            auto& vof = vofs[ivof];
+            Real phival = phigen(graph, a_dx, voldat, vof);
+            hostdata[dit[ibox]](vof, 0) = phival;
+          }
+        }
+      }
+    }
+    else if(which_phi  == string("Polynomial"))
+    {
+      int num_terms;
+      pp.get("polynomial_num_terms", num_terms);
+      std::vector<Real> coeffvec;
+      std::vector<int>  powervec;
+
+      pp.getarr("polynomial_powers"      , powervec, 0, num_terms);
+      pp.getarr("polynomial_coefficients", coeffvec, 0, num_terms);
+      
+      for(int idir = 0; idir < DIM; idir++)
+      {
+        center[idir] = centvec[idir];
+      }
+      hoeb::CosineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
+
+    
+      auto voldatldptr = a_geoserv->getVoluData(a_domain);
+      const auto& voldatld = *voldatldptr;
+      Chombo4::DataIterator dit = a_grids.dataIterator();
+      for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
+      {
+        const auto& graph  = (*a_graphs)[dit[ibox]];
+        const auto& voldat = voldatld[dit[ibox]];
+        Bx validbx = graph.validBox();
+        for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
+        {
+          auto vofs= graph.getVoFs(*bit);
+          for(int ivof = 0; ivof < vofs.size(); ++ivof)
+          {
+            auto& vof = vofs[ivof];
+            Real phival = phigen(graph, a_dx, voldat, vof);
+            hostdata[dit[ibox]](vof, 0) = phival;
+          }
+        }
+      }
+    }
     EBLevelBoxData<CELL, 1>::copyToDevice(a_phi, hostdata);
   }
   /****/
