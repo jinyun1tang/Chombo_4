@@ -342,58 +342,7 @@ namespace Proto
     PR_TIME("ifdata::defineLocalCoords");
     // default for full cells
     m_localCoord.m_origin = m_cellCenterCoord.m_origin;
-    /**
-       the stuff below makes convergence tests do weird things
-       but makes for better answers
-       dtg-- this is broken and needs to go away --dtg
-    */
-    if(0)
-    {
-      if (m_intersections.size() == 0)
-      {
-        m_localCoord.m_origin = m_cellCenterCoord.m_origin;
-      }
-      else
-      {
-        m_localCoord.m_origin = RvDim::Zero;
-
-        for (typename EdgeIntersections::const_iterator it = m_intersections.begin();it != m_intersections.end(); ++it)
-        {
-          const EdgeIndex& edgeIndex = it->first;
-          const double&      intercept = it->second;
-
-          int varyDir = edgeIndex[0];
-
-          RvDim intersectPt = RvDim::Zero;
-          intersectPt[varyDir] = intercept;
-
-          for (int i = 1; i < dim; i++)
-          {
-            int curDir;
-            int loHi;
-
-            if (i <= varyDir)
-            {
-              curDir = i-1;
-            }
-            else
-            {
-              curDir = i;
-            }
-
-            loHi = edgeIndex[i];
-            intersectPt[curDir]  = loHi - 0.5;
-            intersectPt[curDir] *= m_globalCoord.m_dx[curDir];
-          }
-
-          m_localCoord.m_origin -= intersectPt;
-        }
-
-        m_localCoord.m_origin /= m_intersections.size();
-      }
-    }
-    /**/
-    m_localCoord.m_dx =  m_globalCoord.m_dx;
+    m_localCoord.m_dx     =  m_globalCoord.m_dx;
   }
 
   template <int dim> bool IFData<dim>::isConnected(int          & a_edgeDir,
