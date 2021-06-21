@@ -212,7 +212,8 @@ namespace hoeb
     bool inside = false;
     ParmParse pp;
     string which_phi;
-    pp.get("which_phi", whichphi);
+    pp.get("which_phi", which_phi);
+    shared_ptr<BaseExactSolution<HOEB_MAX_ORDER> > phigenptr;
     if(which_phi  == string("SineSphere"))
     {
       std::vector<Real> centvec;
@@ -223,99 +224,51 @@ namespace hoeb
       {
         center[idir] = centvec[idir];
       }
-      hoeb::SineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
-
-    
-      auto voldatldptr = a_geoserv->getVoluData(a_domain);
-      const auto& voldatld = *voldatldptr;
-      Chombo4::DataIterator dit = a_grids.dataIterator();
-      for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
-      {
-        const auto& graph  = (*a_graphs)[dit[ibox]];
-        const auto& voldat = voldatld[dit[ibox]];
-        Bx validbx = graph.validBox();
-        for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
-        {
-          auto vofs= graph.getVoFs(*bit);
-          for(int ivof = 0; ivof < vofs.size(); ++ivof)
-          {
-            auto& vof = vofs[ivof];
-            Real phival = phigen(graph, a_dx, voldat, vof);
-            hostdata[dit[ibox]](vof, 0) = phival;
-          }
-        }
-      }
-    }
-    else if(which_phi  == string("CosineSphere"))
-    {
-      std::vector<Real> centvec;
-      pp.get("radius", radius);
-      pp.get("inside", inside);
-      pp.getarr("center", centvec, 0, DIM);
-      for(int idir = 0; idir < DIM; idir++)
-      {
-        center[idir] = centvec[idir];
-      }
-      hoeb::CosineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
-
-    
-      auto voldatldptr = a_geoserv->getVoluData(a_domain);
-      const auto& voldatld = *voldatldptr;
-      Chombo4::DataIterator dit = a_grids.dataIterator();
-      for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
-      {
-        const auto& graph  = (*a_graphs)[dit[ibox]];
-        const auto& voldat = voldatld[dit[ibox]];
-        Bx validbx = graph.validBox();
-        for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
-        {
-          auto vofs= graph.getVoFs(*bit);
-          for(int ivof = 0; ivof < vofs.size(); ++ivof)
-          {
-            auto& vof = vofs[ivof];
-            Real phival = phigen(graph, a_dx, voldat, vof);
-            hostdata[dit[ibox]](vof, 0) = phival;
-          }
-        }
-      }
+      phigenptr =shared_ptr<BaseExactSolution<HOEB_MAX_ORDER> >
+        (new  hoeb::SineSphereEF<HOEB_MAX_ORDER>(radius, center));
     }
     else if(which_phi  == string("Polynomial"))
     {
       int num_terms;
       pp.get("polynomial_num_terms", num_terms);
-      std::vector<Real> coeffvec;
-      std::vector<int>  powervec;
 
-      pp.getarr("polynomial_powers"      , powervec, 0, num_terms);
-      pp.getarr("polynomial_coefficients", coeffvec, 0, num_terms);
-      
-      for(int idir = 0; idir < DIM; idir++)
+      std::vector<std::pair<Point, Real> > entries(num_terms);
+      for(int iterm = 0; iterm < num_terms; iterm++)
       {
-        center[idir] = centvec[idir];
+        Real coeff;
+        std::vector<int>  powervec(DIM);
+        string powerstr = string("polynomial_powers_")      + std::to_string(iterm);
+        string coeffstr = string("polynomial_coefficient_") + std::to_string(iterm);
+        pp.getarr(powerstr.c_str(), powervec, 0, DIM);
+        pp.get   (coeffstr.c_str(), coeff);
+        Point power(powervec);
+        entries[iterm].first  = power;
+        entries[iterm].second = coeff;
       }
-      hoeb::CosineSphereEF<HOEB_MAX_ORDER> phigen(radius, center);
+      phigenptr = shared_ptr<BaseExactSolution<HOEB_MAX_ORDER> >(new hoeb::PolynomialEF<HOEB_MAX_ORDER>(entries));
+    }
 
-    
-      auto voldatldptr = a_geoserv->getVoluData(a_domain);
-      const auto& voldatld = *voldatldptr;
-      Chombo4::DataIterator dit = a_grids.dataIterator();
-      for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
+    auto& phigen = *phigenptr;
+    auto voldatldptr = a_geoserv->getVoluData(a_domain);
+    const auto& voldatld = *voldatldptr;
+    Chombo4::DataIterator dit = a_grids.dataIterator();
+    for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
+    {
+      const auto& graph  = (*a_graphs)[dit[ibox]];
+      const auto& voldat = voldatld[dit[ibox]];
+      Bx validbx = graph.validBox();
+      for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
       {
-        const auto& graph  = (*a_graphs)[dit[ibox]];
-        const auto& voldat = voldatld[dit[ibox]];
-        Bx validbx = graph.validBox();
-        for(auto bit = validbx.begin(); bit != validbx.end(); ++bit)
+        auto vofs= graph.getVoFs(*bit);
+        for(int ivof = 0; ivof < vofs.size(); ++ivof)
         {
-          auto vofs= graph.getVoFs(*bit);
-          for(int ivof = 0; ivof < vofs.size(); ++ivof)
-          {
-            auto& vof = vofs[ivof];
-            Real phival = phigen(graph, a_dx, voldat, vof);
-            hostdata[dit[ibox]](vof, 0) = phival;
-          }
+          auto& vof = vofs[ivof];
+          Real phival = phigen(graph, a_dx, voldat, vof);
+          hostdata[dit[ibox]](vof, 0) = phival;
         }
       }
     }
+
     EBLevelBoxData<CELL, 1>::copyToDevice(a_phi, hostdata);
   }
   /****/

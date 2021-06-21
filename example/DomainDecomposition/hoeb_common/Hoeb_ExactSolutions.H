@@ -23,7 +23,6 @@ namespace hoeb
     BaseExactSolution()
     {
     }
-
     ///
     Real operator()(const EBGraph & a_graph,
                     const Real    & a_dx,
@@ -821,7 +820,7 @@ namespace hoeb
       for(int ient = 0; ient < m_entries.size(); ient++)
       {
         MonomialEF<order> mono(m_entries[ient]);
-        Real monoval = mono.derivative(a_deriv, a_loc);
+        Real monoval = mono.getDerivative(a_deriv, a_loc);
         retval += monoval;
       }
       return retval;
