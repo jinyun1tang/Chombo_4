@@ -27,24 +27,23 @@
 /****/
 //phi not const because of exchange
 void
-getKappaLphi(EBLevelBoxData<CELL, 1>                                          & a_klp,
-             EBLevelBoxData<CELL, 1>                                          & a_phi,
-             const shared_ptr<LevelData<EBGraph> >                            & a_graphs,
-             const Chombo4::DisjointBoxLayout                                 & a_grids,
-             const Chombo4::Box                                               & a_domain,
-             const Real                                                       & a_dx,
-             const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >& a_dictionary,
-             const shared_ptr< GeometryService<HOEB_MAX_ORDER> >              & a_geoserv)
+getIntFdA(EBLevelFluxData<1>                                               & a_klp,
+          EBLevelBoxData<CELL, 1>                                          & a_phi,
+          const shared_ptr<LevelData<EBGraph> >                            & a_graphs,
+          const Chombo4::DisjointBoxLayout                                 & a_grids,
+          const Chombo4::Box                                               & a_domain,
+          const Real                                                       & a_dx,
+          const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >& a_dictionary,
+          const shared_ptr< GeometryService<HOEB_MAX_ORDER> >              & a_geoserv)
 {
 
   string stencilName;
   string ebbcName;
+  Chombo4::DataIterator dit = a_grids.dataIterator();
   Chombo4::Copier exchangeCopier;
   exchangeCopier.exchangeDefine(a_grids, a_phi.ghostVect());
   a_phi.exchange(exchangeCopier);
-
   //register it for every box
-  Chombo4::DataIterator dit = a_grids.dataIterator();
   for(unsigned int ibox = 0; ibox < dit.size(); ++ibox)
   {
     vector<     EBIndex<CELL>  >          dstVoFs;
@@ -110,18 +109,18 @@ void subtractionTractionF(Var<Real, 1>    a_error,
 PROTO_KERNEL_END(subtractionTractionF, subtractionTraction)
 /****/
 void
-getKLPhiError(EBLevelBoxData<CELL,   1>                                           &  a_errCoar, 
-              const shared_ptr<LevelData<EBGraph> >                               &  a_graphsFine,
-              const Chombo4::DisjointBoxLayout                                    &  a_gridsFine,
-              const Chombo4::Box                                                  &  a_domFine,
-              const Real                                                          &  a_dxFine,
-              const shared_ptr<LevelData<EBGraph> >                               &  a_graphsCoar,
-              const Chombo4::DisjointBoxLayout                                    &  a_gridsCoar,
-              const Chombo4::Box                                                  &  a_domCoar,
-              const Real                                                          &  a_dxCoar,
-              const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >   &  a_dictionary,
-              const shared_ptr< GeometryService<HOEB_MAX_ORDER> >                 &  a_geoserv,
-              int a_nxlev)
+getIntFdAError(EBLevelFluxData<1>                                                  &  a_errCoar, 
+               const shared_ptr<LevelData<EBGraph> >                               &  a_graphsFine,
+               const Chombo4::DisjointBoxLayout                                    &  a_gridsFine,
+               const Chombo4::Box                                                  &  a_domFine,
+               const Real                                                          &  a_dxFine,
+               const shared_ptr<LevelData<EBGraph> >                               &  a_graphsCoar,
+               const Chombo4::DisjointBoxLayout                                    &  a_gridsCoar,
+               const Chombo4::Box                                                  &  a_domCoar,
+               const Real                                                          &  a_dxCoar,
+               const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >   &  a_dictionary,
+               const shared_ptr< GeometryService<HOEB_MAX_ORDER> >                 &  a_geoserv,
+               int a_nxlev)
 {
   ParmParse pp;
   int nghost;
@@ -129,20 +128,20 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
   IntVect dataGhostIV =   nghost*IntVect::Unit;
   EBLevelBoxData<CELL,   1>  phiFine(a_gridsFine, dataGhostIV, a_graphsFine);
   EBLevelBoxData<CELL,   1>  phiCoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
-  EBLevelBoxData<CELL,   1>  klpFine(a_gridsFine, dataGhostIV, a_graphsFine);
-  EBLevelBoxData<CELL,   1>  klpCoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
-  EBLevelBoxData<CELL,   1>  klpFtoC(a_gridsCoar, dataGhostIV, a_graphsCoar);
+  EBLevelFluxData<1>  intFDAFine(a_gridsFine, dataGhostIV, a_graphsFine);
+  EBLevelFluxData<1>  intFDACoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
+  EBLevelFluxData<1>  intFDAFtoC(a_gridsCoar, dataGhostIV, a_graphsCoar);
   
   hoeb::fillPhi(phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_geoserv);
   hoeb::fillPhi(phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_geoserv);
 
-  getKappaLphi(klpFine, phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_dictionary, a_geoserv);
-  getKappaLphi(klpCoar, phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_dictionary, a_geoserv);
+  getIntFdA(intFDAFine,phiFine,a_graphsFine,a_gridsFine,a_domFine, a_dxFine, a_dictionary, a_geoserv);
+  getIntFdA(intFDACoar,phiCoar,a_graphsCoar,a_gridsCoar,a_domCoar, a_dxCoar, a_dictionary, a_geoserv);
 
-  hoeb::restrictKappaLphi(klpFtoC, klpFine,
-                    a_graphsFine, a_gridsFine, a_domFine, a_dxFine,                    
-                    a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar,
-                    a_dictionary, a_geoserv);
+  hoeb::restrictIntFDA(klpFtoC, klpFine,
+                       a_graphsFine, a_gridsFine, a_domFine, a_dxFine,                    
+                       a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar,
+                       a_dictionary, a_geoserv);
 
   //error = Ave(klphifine) - klphicoar 
   Chombo4::DataIterator dit = a_gridsCoar.dataIterator();
@@ -153,22 +152,12 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
     auto& errfab  = a_errCoar[dit[ibox]];
     auto  inputbx = ftocfab.inputBox();
     auto  validbx = (*a_graphsCoar)[dit[ibox]].validBox();
-    ebforall(inputbx, subtractionTraction, validbx, errfab, ftocfab, coarfab);
+    ebforall(inputbx, subtractionTraction, validbx, errfab.m_xflux, ftocfab.m_xflux, coarfab.m_xflux);
+    ebforall(inputbx, subtractionTraction, validbx, errfab.m_yflux, ftocfab.m_yflux, coarfab.m_yflux);
+#if DIM==3    
+    ebforall(inputbx, subtractionTraction, validbx, errfab.m_zflux, ftocfab.m_zflux, coarfab.m_zflux);
+#endif    
   }
-
-  string phiFineName = string("phiFine_") + to_string(a_nxlev) + string(".hdf5");
-  string phiCoarName = string("phiCoar_") + to_string(a_nxlev) + string(".hdf5");
-  string klpFineName = string("klpFine_") + to_string(a_nxlev) + string(".hdf5");
-  string klpCoarName = string("klpCoar_") + to_string(a_nxlev) + string(".hdf5");
-  string klpFtoCName = string("klpFtoC_") + to_string(a_nxlev) + string(".hdf5");
-  string errCoarName = string("errCoar_") + to_string(a_nxlev) + string(".hdf5");
-  Real coveredVal = 0;
-  phiFine.writeToFileHDF5(  phiFineName, coveredVal);
-  phiCoar.writeToFileHDF5(  phiCoarName, coveredVal);
-  klpFine.writeToFileHDF5(  klpFineName, coveredVal);
-  klpCoar.writeToFileHDF5(  klpCoarName, coveredVal);
-  klpFtoC.writeToFileHDF5(  klpFtoCName, coveredVal);
-  a_errCoar.writeToFileHDF5(errCoarName, coveredVal);
 }
 
 /****/
@@ -184,12 +173,9 @@ runTest()
   pp.get("nx"        , nx);
   pp.get("num_ghost_cells"        , nghost);
   pp.get("maxGrid"  , maxGrid);
-  pp.get("coveredval", coveredval);         
-
 
   pout() << "nx"        << " = " <<  nx         << endl;
   pout() << "max_grid"  << " = " <<  maxGrid    << endl;
-  pout() << "coveredval"<< " = " <<  coveredval << endl;         
   
 
   IntVect domLo = IntVect::Zero;
@@ -248,15 +234,15 @@ runTest()
   EBLevelBoxData<CELL,   1>  errCoar(gridsCoar, dataGhostIV, graphsCoar);
   
 
-  getKLPhiError(errMedi, 
-                graphsFine, gridsFine, domFine, dxFine,
-                graphsMedi, gridsMedi, domMedi, dxMedi,
-                dictionary, geoserv, nx);
+  getIntFdAError(errMedi, 
+                 graphsFine, gridsFine, domFine, dxFine,
+                 graphsMedi, gridsMedi, domMedi, dxMedi,
+                 dictionary, geoserv, nx);
 
-  getKLPhiError(errCoar, 
-                graphsMedi, gridsMedi, domMedi, dxMedi,
-                graphsCoar, gridsCoar, domCoar, dxCoar,
-                dictionary, geoserv, nx/2);
+  getIntFdAError(errCoar, 
+                 graphsMedi, gridsMedi, domMedi, dxMedi,
+                 graphsCoar, gridsCoar, domCoar, dxCoar,
+                 dictionary, geoserv, nx/2);
 
 
   //Norm!
@@ -271,7 +257,7 @@ runTest()
   }
   pout() << "||klphi errMedi||_max = " << normMedi << std::endl;
   pout() << "||klphi errCoar||_max = " << normCoar << std::endl;
-  pout() << "Richardson truncation error order for kappa(L(phi))= " << order << std::endl;
+  pout() << "Richardson truncation error order for Int(F dot N dA)= " << order << std::endl;
   return 0;
 }
 
