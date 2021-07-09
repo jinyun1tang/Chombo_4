@@ -131,8 +131,13 @@ namespace hoeb
     pp.get("EBBC"      , a_ebbcName);
     pp.get("alpha"     , alpha);
     pp.get("beta"      , beta);
-    pout() << "domainBC"  << " = " <<  dombcname      << endl;
-    pout() << "EBBC"      << " = " <<  a_ebbcName     << endl;
+    static bool printed = false;
+    if(!printed)
+    {
+      printed = true;
+      pout() << "domainBC"  << " = " <<  dombcname      << endl;
+      pout() << "EBBC"      << " = " <<  a_ebbcName     << endl;
+    }
     
     a_stencilName = string("Dharshi_Laplacian");
 
