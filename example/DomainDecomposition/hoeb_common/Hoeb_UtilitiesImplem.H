@@ -376,12 +376,14 @@ namespace hoeb
         IndexTM<Real, DIM> distance = getIndexDistance(vofloc, a_xbar);
         IndexedMoments<DIM  , HOEB_MAX_ORDER>
           volmom = getIndexedMoment<DIM, cent>(vof, volmomfab, graph, a_dx);
+        Real volmag = volmom[IndexTM<int, DIM>::Zero];
+        PR_assert(volmag > 1.0e-16);
         volmom.shift(distance);
         for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
         {
           auto momind = momit();
           unsigned int currentCol = IndMomDIM::indexOf(momind);
-          retval(currentRow, currentCol) = volmom[momind];
+          retval(currentRow, currentCol) = volmom[momind]/volmag;
         }
         a_weights(currentRow, currentRow) = a_block.m_volumesWgt[currentRow];
         currentRow++;
@@ -706,6 +708,14 @@ namespace hoeb
       
       retval = hoeb::getStencilFromMatrix(Smat, block);
     }
+    //begin debug
+    static bool printed[3] = {false, false, false};
+    if(a_face.m_pt == Point(30, 30) && (!printed[a_facedir]))
+    {
+      printed[a_facedir] = true;
+      retval.print();
+    }
+    //end debug
     return retval;
   }
 
