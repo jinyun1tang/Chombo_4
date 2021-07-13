@@ -358,6 +358,11 @@ namespace hoeb
     LAPACKMatrix retval(Nrows, Pcols);
     a_weights.define(Nrows, Nrows);
     a_weights.setVal(0.);
+    Real cellvol = 1;
+    for(int idir = 0; idir < DIM; idir++)
+    {
+      cellvol *= a_dx;
+    }
     auto dit = a_geoserv->getDBL(a_srcDomain).dataIterator();
     
     const auto & graphsldptr =  a_geoserv->getGraphs(  a_srcDomain);
@@ -377,13 +382,20 @@ namespace hoeb
         IndexedMoments<DIM  , HOEB_MAX_ORDER>
           volmom = getIndexedMoment<DIM, cent>(vof, volmomfab, graph, a_dx);
         Real volmag = volmom[IndexTM<int, DIM>::Zero];
-        PR_assert(volmag > 1.0e-16);
-        volmom.shift(distance);
-        for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+        if(volmag > 1.0e-6*cellvol)
         {
-          auto momind = momit();
-          unsigned int currentCol = IndMomDIM::indexOf(momind);
-          retval(currentRow, currentCol) = volmom[momind]/volmag;
+          volmom.shift(distance);
+          for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+          {
+            auto momind = momit();
+            unsigned int currentCol = IndMomDIM::indexOf(momind);
+            retval(currentRow, currentCol) = volmom[momind]/volmag;
+          }
+        }
+        else
+        {
+          //for tiny cells, set moments to their limits (1 0 0 0...)
+         retval.setSmallCellRow(currentRow);
         }
         a_weights(currentRow, currentRow) = a_block.m_volumesWgt[currentRow];
         currentRow++;
@@ -708,14 +720,6 @@ namespace hoeb
       
       retval = hoeb::getStencilFromMatrix(Smat, block);
     }
-    //begin debug
-    static bool printed[3] = {false, false, false};
-    if(a_face.m_pt == Point(30, 30) && (!printed[a_facedir]))
-    {
-      printed[a_facedir] = true;
-      retval.print();
-    }
-    //end debug
     return retval;
   }
 
