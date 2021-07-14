@@ -9,7 +9,6 @@
 #include "Chombo_ParmParse.H"
 #include "Hoeb_LAPACKMatrix.H"
 #include "implem/Proto_Factorial.H"
-#define HOEB_MAX_ORDER 4
 
 namespace hoeb
 {
@@ -150,7 +149,7 @@ namespace hoeb
     setWgtSection<BOUNDARY,dstcent>(a_block.m_cutfacesDiriWgt, a_block.m_cutfacesDiri,  a_start);
     setWgtSection<BOUNDARY,dstcent>(a_block.m_cutfacesNeumWgt, a_block.m_cutfacesNeum,  a_start);
   }
-  template <CENTERING dstcent>
+  template <CENTERING dstcent, unsigned int OPERATOR_ORDER>
   inline Neighborhood<CELL>
   getCellNeighbors(const EBIndex<dstcent>& a_start,
                    const EBGraph         & a_graph,
@@ -159,7 +158,7 @@ namespace hoeb
                    const int             & a_facedir)
   {
     //need at least as many neighbors as we have coefficients.
-    static const int minsize = IndexedMoments<DIM, HOEB_MAX_ORDER>::size();
+    static const int minsize = IndexedMoments<DIM, OPERATOR_ORDER>::size();
     int radius = 3;
     int maxrad = 4;
     ParmParse pp;

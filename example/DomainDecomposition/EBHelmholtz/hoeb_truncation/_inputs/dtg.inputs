@@ -15,10 +15,10 @@ coveredval = -0.001
 num_ghost_cells = 6
 default_neighbor_radius = 3
 maximum_neighbor_radius = 4
-domainBC     = Dirichlet
+domainBC     = Neumann
 EBBC         = Dirichlet
 # can be SineSphere, Polynomial
-which_phi = Polynomial
+which_phi = SineSphere
 polynomial_num_terms = 3
 polynomial_coefficient_0 = 1.0
 polynomial_coefficient_1 = 1.0

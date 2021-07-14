@@ -173,7 +173,7 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
 
 /****/
 int
-runTest()
+runDharhsiTruncationErrorTest()
 {
   Real coveredval = -1;
   int nx      = 32;
@@ -275,6 +275,114 @@ runTest()
   return 0;
 }
 
+void getTestMetaData(Real                                          &  coveredval,
+                     int                                           &  nx,
+                     int                                           &  maxGrid,
+                     int                                           &  nghost,
+                     Chombo4::ProblemDomain                        &  domain,
+                     Chombo4::ProblemDomain                        &  domFine,
+                     Chombo4::ProblemDomain                        &  domMedi,
+                     Chombo4::ProblemDomain                        &  domCoar,
+                     Chombo4::DisjointBoxLayout                    & gridsFine,
+                     Chombo4::DisjointBoxLayout                    & gridsMedi,
+                     Chombo4::DisjointBoxLayout                    & gridsCoar,
+                     shared_ptr<LevelData<EBGraph> >               & graphsFine,
+                     shared_ptr<LevelData<EBGraph> >               & graphsMedi,
+                     shared_ptr<LevelData<EBGraph> >               & graphsCoar,
+                     shared_ptr< GeometryService<HOEB_MAX_ORDER> > & geomptr,
+                     Real & dxFine, Real & dxMedi, Real & dxCoar)
+{
+  ParmParse pp;
+
+  pp.get("nx"        , nx);
+  pp.get("num_ghost_cells"        , nghost);
+  pp.get("maxGrid"  , maxGrid);
+  pp.get("coveredval", coveredval);         
+
+
+  static printedStuff = false;
+  if(!printedStuff)
+  {
+    printedStuff = true;
+    pout() << "nx"        << " = " <<  nx         << endl;
+    pout() << "max_grid"  << " = " <<  maxGrid    << endl;
+    pout() << "coveredval"<< " = " <<  coveredval << endl;
+  }
+  
+
+  IntVect domLo = IntVect::Zero;
+  IntVect domHi  = (nx - 1)*IntVect::Unit;
+
+  domain = Chombo4::ProblemDomain(domLo, domHi);
+
+  Vector<Chombo4::DisjointBoxLayout> vecgrids;
+  GeometryService<2>::generateGrids(vecgrids, domain.domainBox(), maxGrid);
+
+  gridsFine = vecgrids[0];
+  gridsMedi = vecgrids[1];
+  gridsCoar = vecgrids[2];
+  int geomGhost = 6;
+  RealVect origin = RealVect::Zero();
+  
+  shared_ptr<BaseIF>    impfunc = hoeb::getImplicitFunction();
+  pout() << "defining geometry" << endl;
+  Real dx = 1.0/(Real(nx));
+  vector<Chombo4::Box>    vecdomain(vecgrids.size(), domain.domainBox());
+  vector<Real>   vecdx    (vecgrids.size(), dx);
+  for(int ilev = 1; ilev < vecgrids.size(); ilev++)
+  {
+    vecdomain[ilev] = coarsen(vecdomain[ilev-1], 2);
+    vecdx    [ilev] =           2*vecdx[ilev-1];
+  }
+  
+  dxFine = vecdx[0];
+  dxMedi = vecdx[1];
+  dxCoar = vecdx[2];
+  
+  GeometryService<HOEB_MAX_ORDER>* geomptr =
+    new GeometryService<HOEB_MAX_ORDER>
+    (impfunc, origin, dxFine, domain.domainBox(), vecgrids, geomGhost);
+  
+  geoserv = shared_ptr< GeometryService<HOEB_MAX_ORDER> > geomptr;
+
+  domFine = vecdomain[0];
+  domMedi = vecdomain[1];
+  domCoar = vecdomain[2];
+
+  shared_ptr<LevelData<EBGraph> > graphsFine = geoserv->getGraphs(domFine);
+  shared_ptr<LevelData<EBGraph> > graphsMedi = geoserv->getGraphs(domMedi);
+  shared_ptr<LevelData<EBGraph> > graphsCoar = geoserv->getGraphs(domCoar);
+}
+/****/
+int
+runInitialPhiConvergenceTest()
+{
+  Real                                            coveredval;
+  int                                             nx;
+  int                                             maxGrid;
+  int                                             nghost;
+  Chombo4::ProblemDomain                          domain;
+  Chombo4::ProblemDomain                          domFine;
+  Chombo4::ProblemDomain                          domMedi;
+  Chombo4::ProblemDomain                          domCoar;
+  Chombo4::DisjointBoxLayout                      gridsFine;
+  Chombo4::DisjointBoxLayout                      gridsMedi;
+  Chombo4::DisjointBoxLayout                      gridsCoar;
+  shared_ptr<LevelData<EBGraph> >                 graphsFine;
+  shared_ptr<LevelData<EBGraph> >                 graphsMedi;
+  shared_ptr<LevelData<EBGraph> >                 graphsCoar;
+  shared_ptr< GeometryService<HOEB_MAX_ORDER> >   geomptr;
+  Real  dxFine; Real  dxMedi; Real  dxCoar;
+
+  getTestMetaData( coveredval, nx, maxGrid, nghost, domain,
+                   domFine  ,    domMedi,   domCoar,
+                   gridsFine,  gridsMedi, gridsCoar,
+                   graphsFine,graphsMedi,
+                   graphsCoar,
+                   geomptr,
+                   dxFine, dxMedi, dxCoar)
+  
+}
 
 int main(int a_argc, char* a_argv[])
 {
@@ -297,7 +405,8 @@ int main(int a_argc, char* a_argv[])
     }
     char* in_file = a_argv[1];
     ParmParse  pp(a_argc-2,a_argv+2,NULL,in_file);
-    runTest();
+    runInitialPhiConvergenceTest();
+    runDharshiTruncationTest();
   }
 
   pout() << "printing time table " << endl;

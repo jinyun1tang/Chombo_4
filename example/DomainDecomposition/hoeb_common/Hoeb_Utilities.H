@@ -7,7 +7,7 @@
 #include "Chombo_EBDictionary.H"
 #include "Hoeb_LAPACKMatrix.H"
 #include "Hoeb_Neighborhood.H"
-#define HOEB_MAX_ORDER 4
+
 
 namespace hoeb
 {

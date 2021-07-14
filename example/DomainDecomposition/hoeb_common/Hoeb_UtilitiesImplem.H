@@ -29,14 +29,14 @@ namespace hoeb
     return distance;
   }
   /******/
-  template <unsigned int D, CENTERING cent>
-  inline IndexedMoments<D, HOEB_MAX_ORDER>   
+  template <unsigned int D, CENTERING cent, unsigned int GEOMETRY_ORDER>
+  inline IndexedMoments<D, GEOMETRY_ORDER>   
   getIndexedMoment(const EBIndex<cent>                                              &   a_index,
-                   const HostIrregData<cent, IndexedMoments<D, HOEB_MAX_ORDER>, 1>  &   a_irregfab,
+                   const HostIrregData<cent, IndexedMoments<D, GEOMETRY_ORDER>, 1>  &   a_irregfab,
                    const EBGraph                                                    &   a_graph,
                    const Real                                                       &   a_dx)
   {
-    IndexedMoments<D, HOEB_MAX_ORDER> retval;
+    IndexedMoments<D, GEOMETRY_ORDER> retval;
     
     if(a_graph.isRegular(a_index.m_pt))
     {
@@ -68,9 +68,10 @@ namespace hoeb
 
   ***/
   ///template specialization for x
-  inline IndexedMoments<DIM-1, HOEB_MAX_ORDER>   
+  template<unsigned int GEOMETRY_ORDER>
+  inline IndexedMoments<DIM-1, GEOMETRY_ORDER>   
   getIndexedMoment(const EBIndex<XFACE>                                & a_index,
-                   const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                   const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                    const Chombo4::Box                                  & a_srcDomain,
                    unsigned int                                          a_ibox,
                    Real                                                  a_dx)
@@ -83,9 +84,10 @@ namespace hoeb
     return getIndexedMoment<DIM-1,XFACE>(a_index, xfacdatfab, graph, a_dx);
   }
   ///template specialization for y
-  inline IndexedMoments<DIM-1, HOEB_MAX_ORDER>   
+  template<unsigned int GEOMETRY_ORDER>
+  inline IndexedMoments<DIM-1, GEOMETRY_ORDER>   
   getIndexedMoment(const EBIndex<YFACE>                                &   a_index,
-                   const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                   const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                    const Chombo4::Box                                  & a_srcDomain,
                    unsigned int                                          a_ibox,
                    Real                                                  a_dx)
@@ -98,9 +100,10 @@ namespace hoeb
     return getIndexedMoment<DIM-1, YFACE>(a_index, yfacdatfab, graph, a_dx);
   }
   ///template specialization for z
-  inline IndexedMoments<DIM-1, HOEB_MAX_ORDER>   
+  template<unsigned int GEOMETRY_ORDER>
+  inline IndexedMoments<DIM-1, GEOMETRY_ORDER> 
   getIndexedMoment(const EBIndex<ZFACE>                                & a_index,
-                   const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                   const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                    const Chombo4::Box                                  & a_srcDomain,
                    unsigned int                                          a_ibox,
                    Real                                                  a_dx,
@@ -155,9 +158,9 @@ namespace hoeb
     return retval;
   }
   ///
-  template <unsigned int D>
-  IndexedMoments<D, HOEB_MAX_ORDER>
-  getVolMomFromFacMom(const IndexedMoments<D-1, HOEB_MAX_ORDER>& a_facmom,
+  template <unsigned int D, unsigned int GEOMETRY_ORDER>
+  IndexedMoments<D, GEOMETRY_ORDER>
+  getVolMomFromFacMom(const IndexedMoments<D-1, GEOMETRY_ORDER>& a_facmom,
                       int a_facedir)
   {
     IndexedMoments<D, HOEB_MAX_ORDER> retval;
@@ -179,9 +182,10 @@ namespace hoeb
     return retval;
   }
   /*************/
-  inline IndexedMoments<DIM, HOEB_MAX_ORDER>
+  template <unsigned int GEOMETRY_ORDER>
+  inline IndexedMoments<DIM, GEOMETRY_ORDER>
   getEBIndexedMoment(const EBIndex<BOUNDARY>                             & a_face,
-                     const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                     const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                      const Chombo4::Box                                  & a_srcDomain,
                      const Chombo4::DataIndex                            & a_datind,
                      const EBGraph                                       & a_graph,
@@ -196,9 +200,10 @@ namespace hoeb
     return retval;
   }
   /*************/
-  inline IndexedMoments<DIM, HOEB_MAX_ORDER>
+  template <unsigned int GEOMETRY_ORDER>
+  inline IndexedMoments<DIM, GEOMETRY_ORDER>
   getEBNormalMoment(const EBIndex<BOUNDARY>                             & a_face,
-                    const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                    const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                     const Chombo4::Box                                  & a_srcDomain,
                     const Chombo4::DataIndex                            & a_datind,
                     const EBGraph                                       & a_graph,
@@ -234,11 +239,12 @@ namespace hoeb
     return retval;
   }
   ////
+  template <unsigned int GEOMETRY_ORDER>
   inline void
-  shiftMomentAndFillRow(LAPACKMatrix                            & a_mat,
-                        IndexedMoments<    DIM, HOEB_MAX_ORDER> & a_bcmom,
-                        const IndexTM<Real, DIM>                & a_xbardistance,
-                        const unsigned int                      & a_currentRow)
+  shiftMomentAndFillRow(LAPACKMatrix                             & a_mat,
+                        IndexedMoments<     DIM, GEOMETRY_ORDER> & a_bcmom,
+                        const IndexTM<Real, DIM>                 & a_xbardistance,
+                        const unsigned int                       & a_currentRow)
   {
                           
     //shift so it has the same xbar
@@ -251,9 +257,10 @@ namespace hoeb
     }
   }
   /////
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   inline void
   fillMatrixRowForEBBC(LAPACKMatrix                                        & a_mat,
-                       const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                       const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                        const Chombo4::Box                                  & a_srcDomain,
                        const EBIndex<BOUNDARY>                             & a_face,
                        const EBGraph                                       & a_graph,
@@ -262,7 +269,7 @@ namespace hoeb
                        const unsigned int                                  & a_currentRow,
                        int a_facedir, Real a_dx, string a_bcname)
   {
-    IndexedMoments<    DIM, HOEB_MAX_ORDER> bcmom;
+    IndexedMoments<    DIM, GEOMETRY_ORDER> bcmom;
     if(a_bcname == string("Dirichlet"))
     {
       bcmom =  getEBIndexedMoment(a_face, a_geoserv, a_srcDomain,
@@ -273,12 +280,12 @@ namespace hoeb
       bcmom.setVal(0.);
       for(unsigned int normDir = 0; normDir < DIM; normDir++)
       {
-        for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+        for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
         {
           auto momind = momit();
           Real bcval = 0;
           
-          IndexedMoments<DIM, HOEB_MAX_ORDER> normMom=
+          IndexedMoments<DIM, GEOMETRY_ORDER> normMom=
             getEBNormalMoment(a_face, a_geoserv, a_srcDomain,
                               a_datind, a_graph, normDir, a_dx);
 
@@ -296,11 +303,11 @@ namespace hoeb
   }
 
   ///
-  template < CENTERING cent>
+  template <CENTERING cent, unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   void
   fillMatrixRowForDomBC
   (LAPACKMatrix                                                         & a_mat,
-   const HostIrregData<cent, IndexedMoments<DIM-1, HOEB_MAX_ORDER>, 1 > & a_facdatfab,
+   const HostIrregData<cent, IndexedMoments<DIM-1, GEOMETRY_ORDER>, 1 > & a_facdatfab,
    const EBIndex<cent>                                                  & a_face,
    const EBGraph                                                        & a_graph,
    const IndexTM<Real, DIM>                                             & a_xbardistance,
@@ -308,19 +315,19 @@ namespace hoeb
    int a_facedir, Real  a_dx, string a_bcname)
   {
                        
-    IndexedMoments<DIM-1, HOEB_MAX_ORDER>
+    IndexedMoments<DIM-1, GEOMETRY_ORDER>
       facmom = getIndexedMoment<DIM-1, cent>(a_face, a_facdatfab, a_graph, a_dx);
     //need to translate this into higher dim because that is what the matrix sees
     int facedir = 0;
-    IndexedMoments<    DIM, HOEB_MAX_ORDER> volmom = getVolMomFromFacMom<DIM>(facmom, facedir);
-    IndexedMoments<    DIM, HOEB_MAX_ORDER> bcmom;
+    IndexedMoments<    DIM, GEOMETRY_ORDER> volmom = getVolMomFromFacMom<DIM>(facmom, facedir);
+    IndexedMoments<    DIM, GEOMETRY_ORDER> bcmom;
     if(a_bcname == string("Dirichlet"))
     {
       bcmom = volmom;
     }
     else if(a_bcname == string("Neumann"))
     {
-      for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+      for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
       {
         auto momind = momit();
         Real bcval = 0;
@@ -341,19 +348,19 @@ namespace hoeb
     shiftMomentAndFillRow(a_mat, bcmom, a_xbardistance, a_currentRow);
   }
   /******/  
-  template <CENTERING cent>
+  template <CENTERING cent, unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   LAPACKMatrix
   getMomentMatrix(LAPACKMatrix                                        & a_weights,
                   const Neighborhood<cent>                            & a_block,
-                  const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                  const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                   const Chombo4::Box                                  & a_srcDomain,
                   const RealVect                                      & a_xbar,
                   unsigned int                                          a_ibox,
                   Real                                                  a_dx)
   {
-    typedef IndexedMoments<DIM  , HOEB_MAX_ORDER> IndMomDIM;
-    typedef IndexedMoments<DIM-1, HOEB_MAX_ORDER> IndMomSDMinOne;
-    unsigned int Pcols = IndMomDIM::size();
+    typedef IndexedMoments<DIM  , GEOMETRY_ORDER> IndMomDIM;
+
+    unsigned int Pcols = IndexedMoments<DIM  , OPERATOR_ORDER>::size();
     unsigned int Nrows = a_block.size();
     LAPACKMatrix retval(Nrows, Pcols);
     a_weights.define(Nrows, Nrows);
@@ -379,13 +386,13 @@ namespace hoeb
         EBIndex<cent> vof    = a_block.m_volumes[ivol];
         RealVect vofloc = hoeb::getVoFLocation(vof, a_dx);
         IndexTM<Real, DIM> distance = getIndexDistance(vofloc, a_xbar);
-        IndexedMoments<DIM  , HOEB_MAX_ORDER>
+        IndexedMoments<DIM  , GEOMETRY_ORDER>
           volmom = getIndexedMoment<DIM, cent>(vof, volmomfab, graph, a_dx);
         Real volmag = volmom[IndexTM<int, DIM>::Zero];
         if(volmag > 1.0e-6*cellvol)
         {
           volmom.shift(distance);
-          for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+          for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
           {
             auto momind = momit();
             unsigned int currentCol = IndMomDIM::indexOf(momind);
