@@ -143,10 +143,11 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
   getKappaLphi(klpFine, phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_dictionary, a_geoserv);
   getKappaLphi(klpCoar, phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_dictionary, a_geoserv);
 
-  hoeb::restrictKappaLphi(klpFtoC, klpFine,
-                    a_graphsFine, a_gridsFine, a_domFine, a_dxFine,                    
-                    a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar,
-                    a_dictionary, a_geoserv);
+  hoeb::restrictKappaLphi<GEOMETRY_ORDER>
+    (klpFtoC, klpFine,
+     a_graphsFine, a_gridsFine, a_domFine, a_dxFine,                    
+     a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar,
+     a_dictionary, a_geoserv);
 
   //error = Ave(klphifine) - klphicoar 
   Chombo4::DataIterator dit = a_gridsCoar.dataIterator();

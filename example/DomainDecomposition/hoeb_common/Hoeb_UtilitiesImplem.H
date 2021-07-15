@@ -52,21 +52,6 @@ namespace hoeb
     }
     return retval;
   }
-  /***
-  template <unsigned int D, CENTERING cent>
-  inline IndexedMoments<D, HOEB_MAX_ORDER>   
-  getIndexedMoment(const EBIndex<cent>                                 & a_index,
-                   const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
-                   const Chombo4::Box                                  & a_srcDomain,
-                   unsigned int                                          a_ibox,
-                   Real                                                  a_dx)
-  {
-    IndexedMoments<D, HOEB_MAX_ORDER>   retval;
-    PROTO_ASSERT(false, "should not get here");
-    return retval;
-  }
-
-  ***/
   ///template specialization for x
   template<unsigned int GEOMETRY_ORDER>
   inline IndexedMoments<DIM-1, GEOMETRY_ORDER>   
@@ -118,69 +103,6 @@ namespace hoeb
     return getIndexedMoment<DIM-1, ZFACE>(a_index, zfacdatfab, graph, a_dx);
   }
   
-  template <CENTERING cent>
-  inline RealVect
-  getFaceLocation(const EBIndex<cent>& a_face,
-                  Real                 a_dx,
-                  int                  a_facedir)
-  {
-    RealVect retval;
-    auto pt = a_face.m_pt; //high size of the face
-    //this will work for cell centers or boundary faces as well
-    for(int idir = 0; idir < DIM; idir++)
-    {
-      if(idir == a_facedir)
-      {
-        retval[idir] = a_dx*Real(pt[idir]);
-      }
-      else
-      {
-        retval[idir] = a_dx*(0.5 + Real(pt[idir]));
-      }
-    }
-    return retval;
-  }
-  ///
-  template <unsigned int D>
-  IndexTM<int, D-1>
-  getFaceIndexFromVol(const  IndexTM<int, D>& a_volind, int a_facedir)
-  {
-    IndexTM<int, D-1> retval;
-    int ifac = 0;
-    for(int ivol = 0; ivol < D; ivol++)
-    {
-      if(ivol != a_facedir)
-      {
-        retval[ifac] = a_volind[ivol];
-        ifac++;
-      }
-    }
-    return retval;
-  }
-  ///
-  template <unsigned int D, unsigned int GEOMETRY_ORDER>
-  IndexedMoments<D, GEOMETRY_ORDER>
-  getVolMomFromFacMom(const IndexedMoments<D-1, GEOMETRY_ORDER>& a_facmom,
-                      int a_facedir)
-  {
-    IndexedMoments<D, GEOMETRY_ORDER> retval;
-    for(MomentIterator< D, GEOMETRY_ORDER> momit; momit.ok(); ++momit)
-    {
-      IndexTM<int, D> volpow = momit();
-      Real momval;
-      if(volpow[a_facedir] > 0) //no derivs in this direction
-      {
-        momval = 0;
-      }
-      else
-      {
-        IndexTM<int, D-1> facpow = getFaceIndexFromVol<DIM>(volpow, a_facedir);
-        momval = a_facmom[facpow];
-      }
-      retval[volpow] = momval;
-    }
-    return retval;
-  }
   /*************/
   template <unsigned int GEOMETRY_ORDER>
   inline IndexedMoments<DIM, GEOMETRY_ORDER>
@@ -525,7 +447,7 @@ namespace hoeb
 
 
   //Moore-Penrose inverse of the moment matrix is calulcated using weighted least squares
-  inline LAPACKMatrix
+  LAPACKMatrix
   getMoorePenroseInverse(const LAPACKMatrix & a_M)
   {
     LAPACKMatrix MT = a_M;
@@ -538,8 +460,9 @@ namespace hoeb
     retval.invertUsingSVD(maxiter, tol);
     return retval;
   }
+
   ///
-  inline      LAPACKMatrix
+  LAPACKMatrix
   getStencilMatrix(const LAPACKMatrix & a_Qmat,
                    const LAPACKMatrix & a_Gmat,
                    const LAPACKMatrix & a_GTGinvMat)
@@ -557,11 +480,11 @@ namespace hoeb
 
    
   ///
-  template <CENTERING cent>
+  template <CENTERING cent, unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   inline LAPACKMatrix
   getDharshiQMatrix(const EBIndex<cent>                                 & a_face,
                     const Neighborhood<CELL>                            & a_block,
-                    const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                    const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                     const Chombo4::Box                                  & a_srcDomain,
                     const RealVect                                      & a_xbar,
                     unsigned int                                          a_ibox,
@@ -569,18 +492,19 @@ namespace hoeb
                     int                                                   a_facedir,
                     const Chombo4::DataIndex                            & a_datind)
   {
-    IndexedMoments<DIM-1, HOEB_MAX_ORDER> 
-      facmom = getIndexedMoment(a_face, a_geoserv, a_srcDomain, a_ibox, a_dx);
-    IndexedMoments<    DIM, HOEB_MAX_ORDER> volmom = getVolMomFromFacMom<DIM>(facmom, a_facedir);
+    IndexedMoments<DIM-1, GEOMETRY_ORDER>  facmom
+      = getIndexedMoment<DIM-1, cent, GEOMETRY_ORDER>(a_face, a_geoserv, a_srcDomain, a_ibox, a_dx);
+    IndexedMoments<DIM  , GEOMETRY_ORDER> volmom
+      = getVolMomFromFacMom<DIM, GEOMETRY_ORDER>(facmom, a_facedir);
 
     RealVect facloc = hoeb::getFaceLocation<cent>(a_face, a_dx, a_facedir);
     IndexTM<Real, DIM> distance = getIndexDistance(facloc, a_xbar);
     volmom.shift(distance);
 
     
-    LAPACKMatrix Qmat(1, IndexedMoments<DIM, HOEB_MAX_ORDER>::size());
+    LAPACKMatrix Qmat(1, IndexedMoments<DIM, OPERATOR_ORDER>::size());
 
-    for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+    for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
     {
       auto momind = momit();
       Real matval = 0;
@@ -591,7 +515,7 @@ namespace hoeb
         Real derval = volmom[derind];
         matval = pd*derval;
       }
-      unsigned int currentCol = IndexedMoments<DIM, HOEB_MAX_ORDER>::indexOf(momind);
+      unsigned int currentCol = IndexedMoments<DIM, OPERATOR_ORDER>::indexOf(momind);
       Qmat(0,currentCol) = matval;
     }
     
@@ -599,11 +523,11 @@ namespace hoeb
   }
 
   ///template specialization to get the eb flux q matrix
-  template < >
-  inline LAPACKMatrix
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
+  LAPACKMatrix
   getDharshiQMatrix(const EBIndex<BOUNDARY>                             & a_face,
                     const Neighborhood<CELL>                            & a_block,
-                    const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                    const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                     const Chombo4::Box                                  & a_srcDomain,
                     const RealVect                                      & a_xbar,
                     unsigned int                                          a_ibox,
@@ -611,17 +535,17 @@ namespace hoeb
                     int                                                   a_facedir,
                     const Chombo4::DataIndex                            & a_datind)
   {
-    LAPACKMatrix Qmat;
+    LAPACKMatrix Qmat(1, IndexedMoments<DIM, OPERATOR_ORDER>::size());
     Qmat.setVal(0.);
     const auto & graphsldptr = a_geoserv->getGraphs(    a_srcDomain);
     const auto & graph = (*graphsldptr)[a_datind];
     for(unsigned int normDir = 0; normDir < DIM; normDir++)
     {
-      IndexedMoments<DIM, HOEB_MAX_ORDER> normMom=
+      IndexedMoments<DIM, GEOMETRY_ORDER> normMom=
         getEBNormalMoment(a_face, a_geoserv, a_srcDomain,
                           a_datind, graph, normDir, a_dx);
         
-      for(MomentIterator<DIM, HOEB_MAX_ORDER> momit; momit.ok(); ++momit)
+      for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
       {
         auto momind = momit();
         if(momind[normDir] > 0)
@@ -629,7 +553,7 @@ namespace hoeb
           int pd = momind[normDir];
           IndexTM<int, DIM> derind =momind - IndexTM<int, DIM>::BASISV(normDir);
           Real derval = normMom[derind];
-          unsigned int currentCol = IndexedMoments<DIM, HOEB_MAX_ORDER>::indexOf(momind);
+          unsigned int currentCol = IndexedMoments<DIM, OPERATOR_ORDER>::indexOf(momind);
           Qmat(0,currentCol) += pd*derval;
         }
       }
@@ -637,36 +561,19 @@ namespace hoeb
     return Qmat;
   }
   
-  ///
-  inline 
-  LocalStencil<CELL, Real>
-  getStencilFromMatrix(const LAPACKMatrix      & a_stenmat,
-                       const Neighborhood<CELL>& a_block)
-  {
-    LocalStencil<CELL, Real> retval;
-    for(unsigned int ivol = 0; ivol < a_block.m_volumes.size(); ivol++)
-    {
-      const auto& vof = a_block.m_volumes[ivol];
-      //this depends upon the volumes being the first bits
-      Real wgt = a_stenmat(0, ivol);
-      retval.add(vof, wgt);
-    }
-
-    return retval;
-  }
                        
   ///
   /**
      Return integral F dA  (do NOT divide out the area).
      For EB Fluxes, it is Integral F-n dA with an outward-facing normal.
   */
-  template <CENTERING cent>
+  template <CENTERING cent, unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   LocalStencil<CELL, Real> 
   getDharshiIntFluxDAStencil(const EBIndex<cent>                                 & a_face,
                              const EBIndex<CELL>                                 & a_startingVoF,
                              const std::string                                     a_dombcname[2*DIM],
                              const std::string                                   & a_ebbcname,
-                             const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                             const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                              const Chombo4::Box                                  & a_srcDomain,
                              unsigned int a_ibox,                              
                              Real a_alpha, Real a_beta, Real a_dx, int a_facedir,
@@ -706,8 +613,8 @@ namespace hoeb
 
       //this matrix contains all the moments and boundary condition constraints
       LAPACKMatrix weight;
-      LAPACKMatrix Mmat = getMomentMatrix<CELL>(weight, block, a_geoserv,
-                                                a_srcDomain, xbar, a_ibox, a_dx);
+      LAPACKMatrix Mmat =  getMomentMatrix<CELL, OPERATOR_ORDER, GEOMETRY_ORDER>
+        (weight, block, a_geoserv, a_srcDomain, xbar, a_ibox, a_dx);
 
       LAPACKMatrix Gmat; //G = WM
       multiply(Gmat, weight, Mmat);
@@ -719,7 +626,7 @@ namespace hoeb
 
       //this is the matrix that defines the operator
       LAPACKMatrix Qmat =
-        getDharshiQMatrix<cent>
+        getDharshiQMatrix<cent, OPERATOR_ORDER, GEOMETRY_ORDER>
         (a_face, block, a_geoserv, a_srcDomain, xbar, a_ibox, a_dx, a_facedir, datind);
 
       LAPACKMatrix Smat = getStencilMatrix(Qmat, Gmat, GTGinvMat);
@@ -729,13 +636,52 @@ namespace hoeb
     return retval;
   }
 
+  template <CENTERING cent>
+  inline RealVect
+  getFaceLocation(const EBIndex<cent>& a_face,
+                  Real                 a_dx,
+                  int                  a_facedir)
+  {
+    RealVect retval;
+    auto pt = a_face.m_pt; //high size of the face
+    //this will work for cell centers or boundary faces as well
+    for(int idir = 0; idir < DIM; idir++)
+    {
+      if(idir == a_facedir)
+      {
+        retval[idir] = a_dx*Real(pt[idir]);
+      }
+      else
+      {
+        retval[idir] = a_dx*(0.5 + Real(pt[idir]));
+      }
+    }
+    return retval;
+  }
+  ///
+  LocalStencil<CELL, Real>
+  getStencilFromMatrix(const LAPACKMatrix      & a_stenmat,
+                       const Neighborhood<CELL>& a_block)
+  {
+    LocalStencil<CELL, Real> retval;
+    for(unsigned int ivol = 0; ivol < a_block.m_volumes.size(); ivol++)
+    {
+      const auto& vof = a_block.m_volumes[ivol];
+      //this depends upon the volumes being the first bits
+      Real wgt = a_stenmat(0, ivol);
+      retval.add(vof, wgt);
+    }
+
+    return retval;
+  }
   
   /******/  
+  template<unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   LocalStencil<CELL, Real> 
   getFullDharshiStencil(const EBIndex<CELL>                                 & a_vof,
                         const std::string                                     a_dombcname[2*DIM],
                         const std::string                                   & a_ebbcname,
-                        const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                        const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                         Proto::Box                                          & a_srcDomain,
                         unsigned int a_ibox, Real a_alpha, Real a_beta, Real a_dx) 
   {
@@ -754,10 +700,11 @@ namespace hoeb
         {
           auto face = xfaces[iface];
           LocalStencil<CELL, Real> fluxsten =
-            getDharshiIntFluxDAStencil<XFACE>(face,
-                                              a_vof,a_dombcname,a_ebbcname,
-                                              a_geoserv, a_srcDomain, a_ibox,
-                                              a_alpha, a_beta, a_dx, 0, sit());
+            getDharshiIntFluxDAStencil<XFACE, OPERATOR_ORDER, GEOMETRY_ORDER>
+            (face,
+             a_vof,a_dombcname,a_ebbcname,
+             a_geoserv, a_srcDomain, a_ibox,
+             a_alpha, a_beta, a_dx, 0, sit());
           fluxsten *= Real(isign);
           vofsten += fluxsten;
         }
@@ -768,10 +715,11 @@ namespace hoeb
         {
           auto face = yfaces[iface];
           LocalStencil<CELL, Real> fluxsten =
-            getDharshiIntFluxDAStencil<YFACE>(face,
-                                              a_vof,a_dombcname,a_ebbcname,
-                                              a_geoserv, a_srcDomain, a_ibox,
-                                              a_alpha, a_beta, a_dx, 1, sit());
+            getDharshiIntFluxDAStencil<YFACE, OPERATOR_ORDER, GEOMETRY_ORDER>
+            (face,
+             a_vof,a_dombcname,a_ebbcname,
+             a_geoserv, a_srcDomain, a_ibox,
+             a_alpha, a_beta, a_dx, 1, sit());
           fluxsten *= Real(isign);
           vofsten += fluxsten;
         }
@@ -783,10 +731,11 @@ namespace hoeb
         {
           auto face = zfaces[iface];
           LocalStencil<CELL, Real> fluxsten =
-            getDharshiIntFluxDAStencil<ZFACE>(face,
-                                              a_vof, a_dombcname, a_ebbcname,
-                                              a_geoserv, a_srcDomain, a_ibox,
-                                              a_alpha, a_beta, a_dx, 2, sit());
+            getDharshiIntFluxDAStencil<ZFACE, OPERATOR_ORDER, GEOMETRY_ORDER>
+            (face,
+             a_vof, a_dombcname, a_ebbcname,
+             a_geoserv, a_srcDomain, a_ibox,
+             a_alpha, a_beta, a_dx, 2, sit());
           fluxsten *= Real(isign);
           vofsten += fluxsten;
         }
@@ -797,10 +746,11 @@ namespace hoeb
       EBIndex<BOUNDARY> face = a_vof.getCutFace();
       LocalStencil<CELL, Real>
         fluxsten =
-        getDharshiIntFluxDAStencil<BOUNDARY>(face,
-                                             a_vof,a_dombcname,a_ebbcname,
-                                             a_geoserv, a_srcDomain, a_ibox,
-                                             a_alpha, a_beta, a_dx, -1, Side::Invalid);
+        getDharshiIntFluxDAStencil<BOUNDARY, OPERATOR_ORDER, GEOMETRY_ORDER>
+        (face,
+         a_vof,a_dombcname,a_ebbcname,
+         a_geoserv, a_srcDomain, a_ibox,
+         a_alpha, a_beta, a_dx, -1, Side::Invalid);
       vofsten += fluxsten;
     }
     //need to divide by dx^d to get kappa*lapl(phi)
@@ -821,6 +771,7 @@ namespace hoeb
   }
 
   /******/
+  template<unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   void
   dharshiLaplStencil(string                                              & a_stencilName,
                      string                                              & a_ebbcName,
@@ -833,7 +784,7 @@ namespace hoeb
                      Proto::Point                                        & a_srcGhost,
                      Proto::Point                                        & a_dstGhost,
                      bool                                                & a_needDiagonalWeights,
-                     const shared_ptr< GeometryService<HOEB_MAX_ORDER> > & a_geoserv,
+                     const shared_ptr< GeometryService<GEOMETRY_ORDER> > & a_geoserv,
                      const Chombo4::DisjointBoxLayout                    & a_grids,
                      const Chombo4::Box                                  & a_domain,
                      const Real                                          & a_dx,
@@ -891,17 +842,18 @@ namespace hoeb
       auto vofs = graph.getVoFs(*bit);
       for(unsigned int ivof = 0; ivof < vofs.size(); ivof++)
       {
-        LocalStencil<CELL, Real> vofsten = getFullDharshiStencil(vofs[ivof],
-                                                                 dombcarray, a_ebbcName,
-                                                                 a_geoserv, a_srcDomain, a_ibox,
-                                                                 alpha, beta, a_dx);
+        LocalStencil<CELL, Real> vofsten =
+          getFullDharshiStencil<OPERATOR_ORDER, GEOMETRY_ORDER>(vofs[ivof],
+                                                                dombcarray, a_ebbcName,
+                                                                a_geoserv, a_srcDomain, a_ibox,
+                                                                alpha, beta, a_dx);
         a_dstVoFs.push_back(vofs[ivof]);
         a_stencil.push_back(vofsten);
       }
     }
   }
 
-  shared_ptr<BaseIF> getImplicitFunction()
+  inline shared_ptr<BaseIF> getImplicitFunction()
   {
     RealVect center = 0.5*RealVect::Unit();
     Real radius = 0.1;
@@ -919,17 +871,20 @@ namespace hoeb
     shared_ptr<BaseIF> retval(static_cast<BaseIF*>(sphereptr));
     return retval;
   }
-
-  /****/
+  ///
+  /**
+     Fill in scalar from exactsolutions class
+  */
+  template< unsigned int GEOMETRY_ORDER>
   void
   fillPhi(EBLevelBoxData<CELL, 1>                                &  a_phi,
           const shared_ptr<LevelData<EBGraph> >                  &  a_graphs,
           const Chombo4::DisjointBoxLayout                       &  a_grids,
-          const Chombo4::Box                                     &  a_domain,
+          const Chombo4::Box                                     &  a_domFine,
           const Real                                             &  a_dx,
-          const shared_ptr< GeometryService<HOEB_MAX_ORDER> >    &  a_geoserv)
+          const shared_ptr< GeometryService<GEOMETRY_ORDER> >    &  a_geoserv)
   {
-    typedef IndexedMoments<DIM  , HOEB_MAX_ORDER> IndMomDIM;
+    typedef IndexedMoments<DIM  , GEOMETRY_ORDER> IndMomDIM;
     typedef HostIrregData<CELL,      IndMomDIM , 1>  VoluData;
     typedef GraphConstructorFactory<EBHostData<CELL, Real, 1> > hostfactory_t;
     
@@ -942,7 +897,7 @@ namespace hoeb
     ParmParse pp;
     string which_phi;
     pp.get("which_phi", which_phi);
-    shared_ptr<BaseExactSolution<HOEB_MAX_ORDER> > phigenptr;
+    shared_ptr<BaseExactSolution<GEOMETRY_ORDER> > phigenptr;
     if(which_phi  == string("SineSphere"))
     {
       std::vector<Real> centvec;
@@ -953,8 +908,8 @@ namespace hoeb
       {
         center[idir] = centvec[idir];
       }
-      phigenptr =shared_ptr<BaseExactSolution<HOEB_MAX_ORDER> >
-        (new  hoeb::SineSphereEF<HOEB_MAX_ORDER>(radius, center));
+      phigenptr =shared_ptr<BaseExactSolution<GEOMETRY_ORDER> >
+        (new  hoeb::SineSphereEF<GEOMETRY_ORDER>(radius, center));
     }
     else if(which_phi  == string("Polynomial"))
     {
@@ -974,7 +929,7 @@ namespace hoeb
         entries[iterm].first  = power;
         entries[iterm].second = coeff;
       }
-      phigenptr = shared_ptr<BaseExactSolution<HOEB_MAX_ORDER> >(new hoeb::PolynomialEF<HOEB_MAX_ORDER>(entries));
+      phigenptr = shared_ptr<BaseExactSolution<GEOMETRY_ORDER> >(new hoeb::PolynomialEF<GEOMETRY_ORDER>(entries));
     }
 
     auto& phigen = *phigenptr;
@@ -1000,7 +955,11 @@ namespace hoeb
 
     EBLevelBoxData<CELL, 1>::copyToDevice(a_phi, hostdata);
   }
-  /****/
+
+  ///
+  /**
+   **/
+  template<unsigned int GEOMETRY_ORDER>
   void
   restrictKappaLphi(EBLevelBoxData<CELL, 1>                                           &  a_klpFToC,
                     const EBLevelBoxData<CELL, 1>                                     &  a_klpFine,
@@ -1012,8 +971,8 @@ namespace hoeb
                     const Chombo4::DisjointBoxLayout                                  &  a_gridsCoar,
                     const Chombo4::Box                                                &  a_domCoar,
                     const Real                                                        &  a_dxCoar,
-                    const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> > &  a_dictionary,
-                    const shared_ptr< GeometryService<HOEB_MAX_ORDER> >               &  a_geoserv)
+                    const shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> > &  a_dictionary,
+                    const shared_ptr< GeometryService<GEOMETRY_ORDER> >               &  a_geoserv)
   {
     std::string  nobcname        = string("no_bcs");
     std::string  restrictionName = string("Multigrid_Restriction");
@@ -1032,6 +991,48 @@ namespace hoeb
       //set resc = Ave(resf) (true is initToZero)
       stencil->apply(coarfab, finefab,  true, 1.0);
     }
+  }
+
+  ///
+  template <unsigned int D>
+  IndexTM<int, D-1>
+  getFaceIndexFromVol(const  IndexTM<int, D>& a_volind, int a_facedir)
+  {
+    IndexTM<int, D-1> retval;
+    int ifac = 0;
+    for(int ivol = 0; ivol < D; ivol++)
+    {
+      if(ivol != a_facedir)
+      {
+        retval[ifac] = a_volind[ivol];
+        ifac++;
+      }
+    }
+    return retval;
+  }
+  ///
+  template <unsigned int D, unsigned int GEOMETRY_ORDER>
+  IndexedMoments<D, GEOMETRY_ORDER>
+  getVolMomFromFacMom(const IndexedMoments<D-1, GEOMETRY_ORDER>& a_facmom,
+                      int a_facedir)
+  {
+    IndexedMoments<D, GEOMETRY_ORDER> retval;
+    for(MomentIterator< D, GEOMETRY_ORDER> momit; momit.ok(); ++momit)
+    {
+      IndexTM<int, D> volpow = momit();
+      Real momval;
+      if(volpow[a_facedir] > 0) //no derivs in this direction
+      {
+        momval = 0;
+      }
+      else
+      {
+        IndexTM<int, D-1> facpow = getFaceIndexFromVol<DIM>(volpow, a_facedir);
+        momval = a_facmom[facpow];
+      }
+      retval[volpow] = momval;
+    }
+    return retval;
   }
 }
 #endif
