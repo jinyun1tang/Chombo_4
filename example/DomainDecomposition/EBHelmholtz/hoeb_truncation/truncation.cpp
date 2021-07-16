@@ -36,8 +36,8 @@ getKappaLphi(EBLevelBoxData<CELL, 1>                                          & 
              const Chombo4::DisjointBoxLayout                                 & a_grids,
              const Chombo4::Box                                               & a_domain,
              const Real                                                       & a_dx,
-             const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >& a_dictionary,
-             const shared_ptr< GeometryService<HOEB_MAX_ORDER> >              & a_geoserv)
+             const shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> >& a_dictionary,
+             const shared_ptr< GeometryService<GEOMETRY_ORDER> >              & a_geoserv)
 {
   PROTO_ASSERT((GEOMETRY_ORDER >= OPERATOR_ORDER), "Need at least operator accuracy in geometric moments");
   string stencilName;
@@ -123,8 +123,8 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
               const Chombo4::DisjointBoxLayout                                    &  a_gridsCoar,
               const Chombo4::Box                                                  &  a_domCoar,
               const Real                                                          &  a_dxCoar,
-              const shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >   &  a_dictionary,
-              const shared_ptr< GeometryService<HOEB_MAX_ORDER> >                 &  a_geoserv,
+              const shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> >   &  a_dictionary,
+              const shared_ptr< GeometryService<GEOMETRY_ORDER> >                 &  a_geoserv,
               int a_nxlev)
 {
   ParmParse pp;
@@ -137,8 +137,8 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
   EBLevelBoxData<CELL,   1>  klpCoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
   EBLevelBoxData<CELL,   1>  klpFtoC(a_gridsCoar, dataGhostIV, a_graphsCoar);
   
-  hoeb::fillPhi(phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_geoserv);
-  hoeb::fillPhi(phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_geoserv);
+  hoeb::fillPhi<GEOMETRY_ORDER>(phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_geoserv);
+  hoeb::fillPhi<GEOMETRY_ORDER>(phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_geoserv);
 
   getKappaLphi(klpFine, phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_dictionary, a_geoserv);
   getKappaLphi(klpCoar, phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_dictionary, a_geoserv);
@@ -192,6 +192,9 @@ void getTestMetaData(Real                                          &  coveredval
                      shared_ptr<LevelData<EBGraph> >               & graphsMedi,
                      shared_ptr<LevelData<EBGraph> >               & graphsCoar,
                      shared_ptr< GeometryService<GEOMETRY_ORDER> > & geomptr,
+                     Vector<Chombo4::DisjointBoxLayout>            & vecgrids,
+                     vector<Chombo4::Box>                          & vecdomain,
+                     vector<Real>                                  & vecdx,
                      Real & dxFine, Real & dxMedi, Real & dxCoar)
 {
   ParmParse pp;
@@ -202,7 +205,7 @@ void getTestMetaData(Real                                          &  coveredval
   pp.get("coveredval", coveredval);         
 
 
-  static printedStuff = false;
+  static bool printedStuff = false;
   if(!printedStuff)
   {
     printedStuff = true;
@@ -217,7 +220,6 @@ void getTestMetaData(Real                                          &  coveredval
 
   domain = Chombo4::ProblemDomain(domLo, domHi);
 
-  Vector<Chombo4::DisjointBoxLayout> vecgrids;
   GeometryService<GEOMETRY_ORDER>::generateGrids(vecgrids, domain.domainBox(), maxGrid);
 
   gridsFine = vecgrids[0];
@@ -229,8 +231,8 @@ void getTestMetaData(Real                                          &  coveredval
   shared_ptr<BaseIF>    impfunc = hoeb::getImplicitFunction();
   pout() << "defining geometry" << endl;
   Real dx = 1.0/(Real(nx));
-  vector<Chombo4::Box>    vecdomain(vecgrids.size(), domain.domainBox());
-  vector<Real>   vecdx    (vecgrids.size(), dx);
+  vecdomain.resize(vecgrids.size(), domain.domainBox());
+  vecdx    .resize(vecgrids.size(), dx);
   for(int ilev = 1; ilev < vecgrids.size(); ilev++)
   {
     vecdomain[ilev] = coarsen(vecdomain[ilev-1], 2);
@@ -241,19 +243,17 @@ void getTestMetaData(Real                                          &  coveredval
   dxMedi = vecdx[1];
   dxCoar = vecdx[2];
   
-  GeometryService<GEOMETRY_ORDER>* geomptr =
-    new GeometryService<GEOMETRY_ORDER>
-    (impfunc, origin, dxFine, domain.domainBox(), vecgrids, geomGhost);
+  geomptr = shared_ptr< GeometryService<GEOMETRY_ORDER> >
+    (new GeometryService<GEOMETRY_ORDER>
+     (impfunc, origin, dxFine, domain.domainBox(), vecgrids, geomGhost));
   
-  geoserv = shared_ptr< GeometryService<GEOMETRY_ORDER> > geomptr;
-
   domFine = vecdomain[0];
   domMedi = vecdomain[1];
   domCoar = vecdomain[2];
 
-  shared_ptr<LevelData<EBGraph> > graphsFine = geoserv->getGraphs(domFine);
-  shared_ptr<LevelData<EBGraph> > graphsMedi = geoserv->getGraphs(domMedi);
-  shared_ptr<LevelData<EBGraph> > graphsCoar = geoserv->getGraphs(domCoar);
+  graphsFine = geomptr->getGraphs(domFine.domainBox());
+  graphsMedi = geomptr->getGraphs(domMedi.domainBox());
+  graphsCoar = geomptr->getGraphs(domCoar.domainBox());
 }
 /****/
 int
@@ -273,34 +273,35 @@ runDharhsiTruncationErrorTest()
   shared_ptr<LevelData<EBGraph> >                 graphsFine;
   shared_ptr<LevelData<EBGraph> >                 graphsMedi;
   shared_ptr<LevelData<EBGraph> >                 graphsCoar;
-  shared_ptr< GeometryService<HOEB_MAX_ORDER> >   geomptr;
+  shared_ptr< GeometryService<GEOMETRY_ORDER> >   geomptr;
   Real  dxFine; Real  dxMedi; Real  dxCoar;
-
+  Vector<Chombo4::DisjointBoxLayout> vecgrids;
+  Vector<Chombo4::Box>               vecdomain;
+  vector<Real>                       vecdx;
   getTestMetaData( coveredval, nx, maxGrid, nghost, domain,
-                   domFine  ,    domMedi,   domCoar,
-                   gridsFine,  gridsMedi, gridsCoar,
-                   graphsFine,graphsMedi,
-                   graphsCoar,
-                   geomptr,
+                   domFine  ,    domMedi,    domCoar,
+                   gridsFine,  gridsMedi,  gridsCoar,
+                   graphsFine,graphsMedi, graphsCoar,
+                   geomptr, vecgrids, vecdomain,vecdx,
                    dxFine, dxMedi, dxCoar);
     
-  shared_ptr<EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL> >  dictionary
-    (new     EBDictionary<HOEB_MAX_ORDER, Real, CELL, CELL>
-     (geoserv, vecgrids, vecdomain, vecdx, dataGhostPt));
+  shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> >  dictionary
+    (new     EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL>
+     (geomptr, vecgrids, vecdomain, vecdx, nghost*Point::Ones(1)));
 
-  EBLevelBoxData<CELL,   1>  errMedi(gridsMedi, dataGhostIV, graphsMedi);
-  EBLevelBoxData<CELL,   1>  errCoar(gridsCoar, dataGhostIV, graphsCoar);
+  EBLevelBoxData<CELL,   1>  errMedi(gridsMedi, nghost*IntVect::Unit, graphsMedi);
+  EBLevelBoxData<CELL,   1>  errCoar(gridsCoar, nghost*IntVect::Unit, graphsCoar);
   
 
   getKLPhiError(errMedi, 
-                graphsFine, gridsFine, domFine, dxFine,
-                graphsMedi, gridsMedi, domMedi, dxMedi,
-                dictionary, geoserv, nx);
+                graphsFine, gridsFine, domFine.domainBox(), dxFine,
+                graphsMedi, gridsMedi, domMedi.domainBox(), dxMedi,
+                dictionary, geomptr, nx);
 
   getKLPhiError(errCoar, 
-                graphsMedi, gridsMedi, domMedi, dxMedi,
-                graphsCoar, gridsCoar, domCoar, dxCoar,
-                dictionary, geoserv, nx/2);
+                graphsMedi, gridsMedi, domMedi.domainBox(), dxMedi,
+                graphsCoar, gridsCoar, domCoar.domainBox(), dxCoar,
+                dictionary, geomptr, nx/2);
 
 
   //Norm!
@@ -336,17 +337,20 @@ runInitialPhiConvergenceTest()
   shared_ptr<LevelData<EBGraph> >                 graphsFine;
   shared_ptr<LevelData<EBGraph> >                 graphsMedi;
   shared_ptr<LevelData<EBGraph> >                 graphsCoar;
-  shared_ptr< GeometryService<HOEB_MAX_ORDER> >   geomptr;
+  shared_ptr< GeometryService<GEOMETRY_ORDER> >   geomptr;
   Real  dxFine; Real  dxMedi; Real  dxCoar;
+  Vector<Chombo4::DisjointBoxLayout> vecgrids;
+  Vector<Chombo4::Box>               vecdomain;
+  vector<Real>                       vecdx;
 
   getTestMetaData( coveredval, nx, maxGrid, nghost, domain,
-                   domFine  ,    domMedi,   domCoar,
-                   gridsFine,  gridsMedi, gridsCoar,
-                   graphsFine,graphsMedi,
-                   graphsCoar,
-                   geomptr,
+                   domFine  ,    domMedi,    domCoar,
+                   gridsFine,  gridsMedi,  gridsCoar,
+                   graphsFine,graphsMedi, graphsCoar,
+                   geomptr, vecgrids, vecdomain,vecdx,
                    dxFine, dxMedi, dxCoar);
-  
+
+  return 0;
 }
 
 int main(int a_argc, char* a_argv[])
@@ -371,7 +375,7 @@ int main(int a_argc, char* a_argv[])
     char* in_file = a_argv[1];
     ParmParse  pp(a_argc-2,a_argv+2,NULL,in_file);
     runInitialPhiConvergenceTest();
-    runDharshiTruncationTest();
+    runDharhsiTruncationErrorTest();
   }
 
   pout() << "printing time table " << endl;
