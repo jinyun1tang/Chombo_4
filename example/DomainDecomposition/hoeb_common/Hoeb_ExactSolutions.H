@@ -7,11 +7,11 @@ using std::cerr;
 
 namespace hoeb
 {
-  template <unsigned int order>
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
   class BaseExactSolution
   {
   public:
-    typedef IndexedMoments<DIM  , order> IndMomDIM;
+    typedef IndexedMoments<DIM  , GEOMETRY_ORDER> IndMomDIM;
     typedef       IndexTM<int, DIM>            IvDIM;
     typedef HostIrregData<CELL,IndMomDIM , 1>  VoluData;
 
@@ -36,7 +36,7 @@ namespace hoeb
       {
         centloc[idir] = a_dx*(Real(cell[idir]) + 0.5);
       }
-      IndexedMoments<DIM, order> moments;
+      IndexedMoments<DIM, GEOMETRY_ORDER> moments;
       if(a_graph.isRegular(cell))
       {
         moments.setToRegular(a_dx);
@@ -51,7 +51,7 @@ namespace hoeb
       }
       
       Real volu = moments[IvDIM::Zero];
-      for(MomentIterator<DIM, order> momit; momit.ok(); ++momit)
+      for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
       {
         IvDIM  power = momit();
         Real   deriv = getDerivative(power, centloc);
@@ -74,14 +74,12 @@ namespace hoeb
   };
 
   ///class for always returning zero (for bcs as opposed to being for testing convergence rates)
-  template <unsigned int order>
-  class ZeroSolution: public BaseExactSolution<order>
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
+  class ZeroSolution: public BaseExactSolution<OPERATOR_ORDER, GEOMETRY_ORDER>
   {
   public:
   
     typedef       IndexTM<int, DIM>            IvDIM;
-    typedef IndexedMoments<DIM  , order> IndMomDIM;
-    typedef HostIrregData<CELL,IndMomDIM , 1>  VoluData;
   
     virtual Real getDerivative(IvDIM    a_power,
                                RealVect a_loc)
@@ -101,13 +99,13 @@ namespace hoeb
 
 
   ///phi = sin(pi(r^2 - R0^2)), where r is the distance from a center (c, c, c) and R0 is a radius
-  template <unsigned int order>
-  class SineSphereEF: public BaseExactSolution<order>
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
+  class SineSphereEF: public BaseExactSolution<OPERATOR_ORDER, GEOMETRY_ORDER>
   {
   public:
   
     typedef       IndexTM<int, DIM>            IvDIM;
-    typedef IndexedMoments<DIM  , order> IndMomDIM;
+    typedef IndexedMoments<DIM  , GEOMETRY_ORDER> IndMomDIM;
     typedef HostIrregData<CELL,IndMomDIM , 1>  VoluData;
   
     virtual Real getDerivative(IvDIM    a_deriv,
@@ -428,13 +426,13 @@ namespace hoeb
 
 
   ///phi = cp x^p  
-  template <unsigned int order>
-  class MonomialEF: public BaseExactSolution<order>
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
+  class MonomialEF: public BaseExactSolution<OPERATOR_ORDER, GEOMETRY_ORDER>
   {
   public:
   
     typedef       IndexTM<int, DIM>            IvDIM;
-    typedef IndexedMoments<DIM  , order>       IndMomDIM;
+    typedef IndexedMoments<DIM  , GEOMETRY_ORDER>       IndMomDIM;
     typedef HostIrregData<CELL,IndMomDIM , 1>  VoluData;
   
     virtual Real getDerivative(IvDIM    a_deriv,
@@ -804,14 +802,12 @@ namespace hoeb
   };
 
   ///phi = sum cp x^p  
-  template <unsigned int order>
-  class PolynomialEF: public BaseExactSolution<order>
+  template <unsigned int OPERATOR_ORDER, unsigned int GEOMETRY_ORDER>
+  class PolynomialEF: public BaseExactSolution<OPERATOR_ORDER, GEOMETRY_ORDER>
   {
   public:
   
     typedef       IndexTM<int, DIM>            IvDIM;
-    typedef IndexedMoments<DIM  , order>       IndMomDIM;
-    typedef HostIrregData<CELL,IndMomDIM , 1>  VoluData;
   
     virtual Real getDerivative(IvDIM    a_deriv,
                                RealVect a_loc)
@@ -819,7 +815,7 @@ namespace hoeb
       Real retval = 0;
       for(int ient = 0; ient < m_entries.size(); ient++)
       {
-        MonomialEF<order> mono(m_entries[ient]);
+        MonomialEF<OPERATOR_ORDER, GEOMETRY_ORDER> mono(m_entries[ient]);
         Real monoval = mono.getDerivative(a_deriv, a_loc);
         retval += monoval;
       }
