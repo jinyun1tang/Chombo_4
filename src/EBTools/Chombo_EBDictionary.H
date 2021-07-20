@@ -37,6 +37,10 @@ namespace StencilNames
   //restriction assuming quantity is already kappa weighted.
   static const string MultigridRestriction("Multigrid_Restriction");
   
+
+  //restriction assuming quantity is NOT already kappa weighted.
+  static const string VolumeWeightedRestriction("Volume_Weighted_Restriction");
+  
   ///for correcting tangential velocity at faces
   static const string TanVelCorrect("Tangential_Velocity_Correction");
 

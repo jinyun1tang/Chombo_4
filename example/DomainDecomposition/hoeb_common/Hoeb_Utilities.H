@@ -948,6 +948,66 @@ namespace hoeb
       stencil->apply(coarfab, finefab,  true, 1.0);
     }
   }
+
+  ///
+  template< unsigned int GEOMETRY_ORDER >
+  inline void  
+  fillKappa(  EBLevelBoxData<CELL, 1>                              & a_kappa,
+              const Chombo4::DisjointBoxLayout                     & a_grids,
+              const Chombo4::Box                                   & a_domain,
+              const shared_ptr<LevelData<EBGraph> >                & a_graphs,
+              const shared_ptr<GeometryService<GEOMETRY_ORDER> >   & a_geoserv)
+  {
+    Chombo4::DataIterator dit = a_grids.dataIterator();
+    for(int ibox = 0; ibox < dit.size(); ++ibox)
+    {
+      auto& kappdat = a_kappa[dit[ibox]];
+      auto grid =a_grids[dit[ibox]];
+      Bx  grbx = kappdat.inputBox();
+      const EBGraph  & graph = (*a_graphs)[dit[ibox]];
+      EBHostData<CELL, Real, 1> hostdat(grbx, graph);
+      //fill kappa on the host then copy to the device
+      a_geoserv->fillKappa(hostdat, grid, dit[ibox], a_domain);
+      // now copy to the device
+      EBLevelBoxData<CELL, 1>::copyToDevice(kappdat, hostdat);
+    }
+  }
+  ///
+  /**
+   **/
+  template<unsigned int GEOMETRY_ORDER>
+  inline void
+  restrictPhi(EBLevelBoxData<CELL, 1>                                           &  a_klpFToC,
+              const EBLevelBoxData<CELL, 1>                                     &  a_klpFine,
+              const shared_ptr<LevelData<EBGraph> >                             &  a_graphsFine,
+              const Chombo4::DisjointBoxLayout                                  &  a_gridsFine,
+              const Chombo4::Box                                                &  a_domFine,
+              const Real                                                        &  a_dxFine,
+              const shared_ptr<LevelData<EBGraph> >                             &  a_graphsCoar,
+              const Chombo4::DisjointBoxLayout                                  &  a_gridsCoar,
+              const Chombo4::Box                                                &  a_domCoar,
+              const Real                                                        &  a_dxCoar,
+              const shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> > &  a_dictionary,
+              const shared_ptr< GeometryService<GEOMETRY_ORDER> >               &  a_geoserv)
+  {
+    std::string  nobcname        = string("no_bcs");
+    std::string  restrictionName = string("Volume_Weighted_Restriction");
+    string dombc[2*DIM];
+    for(unsigned int idom = 0; idom < 2*DIM;  idom++)
+    {
+      dombc[idom] = nobcname;
+    }
+    a_dictionary->registerStencil(restrictionName, dombc, nobcname, a_domFine, a_domCoar, false);
+    Chombo4::DataIterator dit = a_gridsCoar.dataIterator();
+    for(unsigned int ibox = 0; ibox < dit.size(); ++ibox)
+    {
+      auto      & coarfab = a_klpFToC[dit[ibox]];
+      const auto& finefab = a_klpFine[dit[ibox]];
+      auto stencil = a_dictionary->getEBStencil(restrictionName, nobcname, a_domFine, a_domCoar, ibox);
+      //set resc = Ave(resf) (true is initToZero)
+      stencil->apply(coarfab, finefab,  true, 1.0);
+    }
+  }
 }
 ///
 

@@ -125,11 +125,8 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
               const Real                                                          &  a_dxCoar,
               const shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> >   &  a_dictionary,
               const shared_ptr< GeometryService<GEOMETRY_ORDER> >                 &  a_geoserv,
-              int a_nxlev)
+              int a_nxlev, int nghost)
 {
-  ParmParse pp;
-  int nghost;
-  pp.get("num_ghost_cells", nghost);
   IntVect dataGhostIV =   nghost*IntVect::Unit;
   EBLevelBoxData<CELL,   1>  phiFine(a_gridsFine, dataGhostIV, a_graphsFine);
   EBLevelBoxData<CELL,   1>  phiCoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
@@ -163,12 +160,12 @@ getKLPhiError(EBLevelBoxData<CELL,   1>                                         
     ebforall(inputbx, subtractionTraction, validbx, errfab, ftocfab, coarfab);
   }
 
-  string phiFineName = string("phiFine_") + to_string(a_nxlev) + string(".hdf5");
-  string phiCoarName = string("phiCoar_") + to_string(a_nxlev) + string(".hdf5");
-  string klpFineName = string("klpFine_") + to_string(a_nxlev) + string(".hdf5");
-  string klpCoarName = string("klpCoar_") + to_string(a_nxlev) + string(".hdf5");
-  string klpFtoCName = string("klpFtoC_") + to_string(a_nxlev) + string(".hdf5");
-  string errCoarName = string("errCoar_") + to_string(a_nxlev) + string(".hdf5");
+  string phiFineName = string("klptest.phiFine_") + to_string(a_nxlev) + string(".hdf5");
+  string phiCoarName = string("klptest.phiCoar_") + to_string(a_nxlev) + string(".hdf5");
+  string klpFineName = string("klptest.klpFine_") + to_string(a_nxlev) + string(".hdf5");
+  string klpCoarName = string("klptest.klpCoar_") + to_string(a_nxlev) + string(".hdf5");
+  string klpFtoCName = string("klptest.klpFtoC_") + to_string(a_nxlev) + string(".hdf5");
+  string errCoarName = string("klptest.errCoar_") + to_string(a_nxlev) + string(".hdf5");
   Real coveredVal = 0;
   phiFine.writeToFileHDF5(  phiFineName, coveredVal);
   phiCoar.writeToFileHDF5(  phiCoarName, coveredVal);
@@ -298,12 +295,12 @@ runDharhsiTruncationErrorTest()
   getKLPhiError(errMedi, 
                 graphsFine, gridsFine, domFine.domainBox(), dxFine,
                 graphsMedi, gridsMedi, domMedi.domainBox(), dxMedi,
-                dictionary, geomptr, nx);
+                dictionary, geomptr, nx, nghost);
 
   getKLPhiError(errCoar, 
                 graphsMedi, gridsMedi, domMedi.domainBox(), dxMedi,
                 graphsCoar, gridsCoar, domCoar.domainBox(), dxCoar,
-                dictionary, geomptr, nx/2);
+                dictionary, geomptr, nx/2, nghost);
 
 
   //Norm!
@@ -316,9 +313,73 @@ runDharhsiTruncationErrorTest()
   {
     order = log(normCoar/normMedi)/log(2.0);
   }
+  pout() << "Dharshi Op Truncation Error Test:  "  << std::endl;
   pout() << "||klphi errMedi||_max = " << normMedi << std::endl;
   pout() << "||klphi errCoar||_max = " << normCoar << std::endl;
   pout() << "Richardson truncation error order for kappa(L(phi))= " << order << std::endl;
+  return 0;
+}
+/****/
+int
+getInitPhiError(EBLevelBoxData<CELL,   1>                                           &  a_errCoar, 
+                const shared_ptr<LevelData<EBGraph> >                               &  a_graphsFine,
+                const Chombo4::DisjointBoxLayout                                    &  a_gridsFine,
+                const Chombo4::Box                                                  &  a_domFine,
+                const Real                                                          &  a_dxFine,
+                const shared_ptr<LevelData<EBGraph> >                               &  a_graphsCoar,
+                const Chombo4::DisjointBoxLayout                                    &  a_gridsCoar,
+                const Chombo4::Box                                                  &  a_domCoar,
+                const Real                                                          &  a_dxCoar,
+                const shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> >   &  a_dictionary,
+                const shared_ptr< GeometryService<GEOMETRY_ORDER> >                 &  a_geoserv,
+                int a_nxlev, int nghost)
+
+{
+  IntVect dataGhostIV =   nghost*IntVect::Unit;
+
+  EBLevelBoxData<CELL,   1>  phiFine(a_gridsFine, dataGhostIV, a_graphsFine);
+  EBLevelBoxData<CELL,   1>  phiCoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
+  EBLevelBoxData<CELL,   1>  phiFtoC(a_gridsCoar, dataGhostIV, a_graphsCoar);
+  EBLevelBoxData<CELL,   1>  kapFine(a_gridsFine, dataGhostIV, a_graphsFine);
+  EBLevelBoxData<CELL,   1>  kapCoar(a_gridsCoar, dataGhostIV, a_graphsCoar);
+  EBLevelBoxData<CELL,   1>  kapFtoC(a_gridsCoar, dataGhostIV, a_graphsCoar);
+  
+  hoeb::fillPhi<OPERATOR_ORDER,GEOMETRY_ORDER>
+    (phiFine, a_graphsFine, a_gridsFine, a_domFine, a_dxFine, a_geoserv);
+  hoeb::fillPhi<OPERATOR_ORDER,GEOMETRY_ORDER>
+    (phiCoar, a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar, a_geoserv);
+
+  hoeb::restrictPhi<GEOMETRY_ORDER>
+    (phiFtoC, phiFine,
+     a_graphsFine, a_gridsFine, a_domFine, a_dxFine,                    
+     a_graphsCoar, a_gridsCoar, a_domCoar, a_dxCoar,
+     a_dictionary, a_geoserv);
+
+  //error = Ave(klphifine) - klphicoar 
+  Chombo4::DataIterator dit = a_gridsCoar.dataIterator();
+  for(unsigned int ibox = 0; ibox < dit.size(); ibox++)
+  {
+    auto& ftocfab =   phiFtoC[dit[ibox]];
+    auto& coarfab =   phiCoar[dit[ibox]];
+    auto& errfab  = a_errCoar[dit[ibox]];
+    auto  inputbx = ftocfab.inputBox();
+    auto  validbx = (*a_graphsCoar)[dit[ibox]].validBox();
+    ebforall(inputbx, subtractionTraction, validbx, errfab, ftocfab, coarfab);
+  }
+  hoeb::fillKappa<GEOMETRY_ORDER>(kapFine, a_gridsFine, a_domFine, a_graphsFine, a_geoserv);
+  hoeb::fillKappa<GEOMETRY_ORDER>(kapCoar, a_gridsCoar, a_domCoar, a_graphsCoar, a_geoserv);
+
+  string phiFineName = string("phitest.phiFine_") + to_string(a_nxlev) + string(".hdf5");
+  string phiCoarName = string("phitest.phiCoar_") + to_string(a_nxlev) + string(".hdf5");
+  string klpFtoCName = string("phitest.phiFtoC_") + to_string(a_nxlev) + string(".hdf5");
+  string errCoarName = string("phitest.errCoar_") + to_string(a_nxlev) + string(".hdf5");
+  
+  Real coveredVal = 0;
+  writeEBLevelHDF5(phiFineName,  phiFine,   kapFine, a_domFine, a_graphsFine, coveredVal);
+  writeEBLevelHDF5(phiCoarName,  phiCoar,   kapCoar, a_domCoar, a_graphsCoar, coveredVal);
+  writeEBLevelHDF5(klpFtoCName,  phiFtoC,   kapCoar, a_domCoar, a_graphsCoar, coveredVal);
+  writeEBLevelHDF5(errCoarName,a_errCoar,   kapCoar, a_domCoar, a_graphsCoar, coveredVal);
+  
   return 0;
 }
 /****/
@@ -344,14 +405,43 @@ runInitialPhiConvergenceTest()
   Vector<Chombo4::DisjointBoxLayout> vecgrids;
   Vector<Chombo4::Box>               vecdomain;
   vector<Real>                       vecdx;
-
   getTestMetaData( coveredval, nx, maxGrid, nghost, domain,
                    domFine  ,    domMedi,    domCoar,
                    gridsFine,  gridsMedi,  gridsCoar,
                    graphsFine,graphsMedi, graphsCoar,
                    geomptr, vecgrids, vecdomain,vecdx,
                    dxFine, dxMedi, dxCoar);
+    
+  shared_ptr<EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL> >  dictionary
+    (new     EBDictionary<GEOMETRY_ORDER, Real, CELL, CELL>
+     (geomptr, vecgrids, vecdomain, vecdx, nghost*Point::Ones(1)));
 
+  EBLevelBoxData<CELL,   1>  errMedi(gridsMedi, nghost*IntVect::Unit, graphsMedi);
+  EBLevelBoxData<CELL,   1>  errCoar(gridsCoar, nghost*IntVect::Unit, graphsCoar);
+  getInitPhiError(errMedi, 
+                  graphsFine, gridsFine, domFine.domainBox(), dxFine,
+                  graphsMedi, gridsMedi, domMedi.domainBox(), dxMedi,
+                  dictionary, geomptr, nx, nghost);
+  getInitPhiError(errCoar, 
+                  graphsMedi, gridsMedi, domMedi.domainBox(), dxMedi,
+                  graphsCoar, gridsCoar, domCoar.domainBox(), dxCoar,
+                  dictionary, geomptr, nx/2, nghost);
+
+
+  //Norm!
+  Real normMedi = errMedi.maxNorm(0);
+  Real normCoar = errCoar.maxNorm(0);
+
+  Real tol = 1.0e-16;
+  Real order = 0;
+  if((normCoar > tol) && (normMedi > tol))
+  {
+    order = log(normCoar/normMedi)/log(2.0);
+  }
+  pout() << "Initial Condition Convergence Test:"  << std::endl;
+  pout() << "||klphi errMedi||_max = " << normMedi << std::endl;
+  pout() << "||klphi errCoar||_max = " << normCoar << std::endl;
+  pout() << "Richardson truncation error order for initial phi = " << order << std::endl;
   return 0;
 }
 
@@ -372,12 +462,25 @@ int main(int a_argc, char* a_argv[])
     }
     char* in_file = a_argv[1];
     ParmParse  pp(a_argc-2,a_argv+2,NULL,in_file);
-    runInitialPhiConvergenceTest();
-    runDharhsiTruncationErrorTest();
-  }
+    bool do_phi_test, do_klp_test;
+    pp.get("do_phi_test", do_phi_test);
+    pp.get("do_klp_test", do_klp_test);
+    if(do_phi_test)
+    {
+      pout() << "doing initial phi convergence test" << endl;
+      runInitialPhiConvergenceTest();
+    }
+    if(do_klp_test)
+    {
+      pout() << "doing Dharshi operator truncation test" << endl;
+      runDharhsiTruncationErrorTest();
+    }
+
+  }    
 
   pout() << "printing time table " << endl;
   CH_TIMER_REPORT();
+    
 #ifdef CH_MPI  
   pout() << "about to call MPI Finalize" << std::endl;
   MPI_Finalize();
