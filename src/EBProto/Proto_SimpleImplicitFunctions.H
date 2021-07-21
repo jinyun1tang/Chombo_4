@@ -504,7 +504,6 @@ namespace Proto
 
   ///
   /**
-     IF where all cells are regular
    */
   class PlaneIF: public SimpleGeometry
   {

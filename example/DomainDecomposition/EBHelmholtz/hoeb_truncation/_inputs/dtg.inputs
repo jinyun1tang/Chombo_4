@@ -6,10 +6,6 @@ maxGrid=  32
 alpha = 0.0
 beta = 1.0
 
-center =       0.5 0.5 0.5
-radius =   0.45
-inside = true
-
 #value in hdf5 file of  covered data
 coveredval = -0.001
 num_ghost_cells = 6
@@ -29,3 +25,9 @@ polynomial_powers_1      = 0 2 0
 polynomial_powers_2      = 0 0 2
 bool do_phi_test = true
 bool do_klp_test = false
+#so far can be plane or sphere
+which_geom = "plane"
+center =       0.5 0.5 0.5
+radius =   0.45
+inside = true
+

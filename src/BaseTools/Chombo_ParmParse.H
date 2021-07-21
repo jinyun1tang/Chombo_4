@@ -35,10 +35,13 @@
 #include "Chombo_CH_assert.H"
 #include "Chombo_MayDay.H"
 #include "Chombo_Vector.H"
+#include "Chombo_REAL.H"
+#include "Proto_RealVect.H"
 #include "Chombo_BaseNamespaceHeader.H"
 using std::cout;
 using std::cerr;
 using std::endl;
+using Proto::RealVect;
 //#include <aString.H>
 
 //#include <Pointers.H>
@@ -3309,6 +3312,32 @@ public:
                int           start_ix,
                int           num_val) const;
 
+
+  inline 
+  void getRV(const char*   name,
+             RealVect &    rv) const
+  {
+    Vector<Real> vec(DIM, 0.0);
+    getarr(name, vec, 0, DIM);
+    for(int idir = 0; idir < DIM; idir++)
+    {
+      rv[idir] = vec[idir];
+    }
+    
+  }
+  
+  inline 
+  void getIV(const char*   name,
+             RealVect &    rv) const
+  {
+    Vector<int> vec(DIM, 0.0);
+    getarr(name, vec, 0, DIM);
+    for(int idir = 0; idir < DIM; idir++)
+    {
+      rv[idir] = vec[idir];
+    }
+    
+  }
   /// access an array
   /** Gets a std::vector<float> of num_val values from last
     occurrence of given name.  If successful, the values

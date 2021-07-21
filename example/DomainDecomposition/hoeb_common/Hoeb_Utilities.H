@@ -810,20 +810,31 @@ namespace hoeb
 
   inline shared_ptr<BaseIF> getImplicitFunction()
   {
-    RealVect center = 0.5*RealVect::Unit();
-    Real radius = 0.1;
-    bool inside = false;
     ParmParse pp;
-    std::vector<Real> centvec;
-    pp.get("radius", radius);
-    pp.get("inside", inside);
-    pp.getarr("center", centvec, 0, DIM);
-    for(int idir = 0; idir < DIM; idir++)
+    string whichgeom;
+    pp.get("which_geom", whichgeom);
+    
+    shared_ptr<BaseIF> retval;
+    if(whichgeom == string("sphere"))
     {
-      center[idir] = centvec[idir];
+      RealVect center;
+      Real radius = 0.1;
+      bool inside = false;
+      pp.get("radius", radius);
+      pp.get("inside", inside);
+      pp.getRV("center", center);
+
+      pout() << "Implicit function is a sphere with radius = " << radius
+             << ", and center = " << center << endl;
+      SimpleSphereIF* sphereptr = new SimpleSphereIF(center, radius, inside);
+      retval = shared_ptr<BaseIF>(static_cast<BaseIF*>(sphereptr));
     }
-    SimpleSphereIF* sphereptr = new SimpleSphereIF(center, radius, inside);
-    shared_ptr<BaseIF> retval(static_cast<BaseIF*>(sphereptr));
+    else if(whichgeom == string("plane"))
+    {
+      RealVect startpt, normal;
+      pp.getRV("plane_startpt", startpt);
+      pp.getRV("plane_normal", normal);
+    }
     return retval;
   }
   ///
@@ -855,14 +866,10 @@ namespace hoeb
     shared_ptr<BaseExactSolution<OPERATOR_ORDER, GEOMETRY_ORDER> > phigenptr;
     if(which_phi  == string("SineSphere"))
     {
-      std::vector<Real> centvec;
       pp.get("radius", radius);
       pp.get("inside", inside);
-      pp.getarr("center", centvec, 0, DIM);
-      for(int idir = 0; idir < DIM; idir++)
-      {
-        center[idir] = centvec[idir];
-      }
+      pp.getRV("center", center);
+
       phigenptr =shared_ptr<BaseExactSolution<OPERATOR_ORDER, GEOMETRY_ORDER> >
         (new  hoeb::SineSphereEF<OPERATOR_ORDER, GEOMETRY_ORDER>(radius, center));
     }
