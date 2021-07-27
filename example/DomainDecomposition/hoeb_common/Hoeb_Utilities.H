@@ -108,8 +108,6 @@ namespace hoeb
         for(MomentIterator<DIM, OPERATOR_ORDER> momit; momit.ok(); ++momit)
         {
           auto momind = momit();
-          Real bcval = 0;
-          
           IndexedMoments<DIM, GEOMETRY_ORDER> normMom=
             hoeb_data::getEBNormalMoment<GEOMETRY_ORDER>
             (a_face, a_geoserv, a_srcDomain,a_datind, a_graph, normDir, a_dx);
@@ -834,6 +832,12 @@ namespace hoeb
       RealVect startpt, normal;
       pp.getRV("plane_startpt", startpt);
       pp.getRV("plane_normal", normal);
+      PlaneIF* planeptr = new PlaneIF(startpt, normal);
+      retval = shared_ptr<BaseIF>(static_cast<BaseIF*>(planeptr));
+    }
+    else
+    {
+      Chombo4::MayDay::Error("unaccounted-for  whichgeom");
     }
     return retval;
   }
