@@ -155,11 +155,11 @@ defineInternals(EBIBC                a_ibc,
   {
     m_helmholtzVelo = shared_ptr<EBMultigrid> 
       (new EBMultigrid(cell_dict, m_geoserv, alpha, beta, m_dx, m_grids,  
-                       stenname, helmnamesVelo, bcname, m_domain, m_nghost));
+                       stenname, helmnamesVelo, bcname, m_domain, m_nghost, string("heat")));
   }
   m_helmholtzSpec = shared_ptr<EBMultigrid> 
     (new EBMultigrid(cell_dict, m_geoserv, alpha, beta, m_dx, m_grids,  
-                     stenname, helmnamesSpec, StencilNames::Neumann, m_domain, m_nghost));
+                     stenname, helmnamesSpec, StencilNames::Neumann, m_domain, m_nghost, string("species")));
 
   if(a_solver == BackwardEuler)
   {
