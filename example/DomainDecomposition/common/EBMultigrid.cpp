@@ -164,10 +164,10 @@ EBPoissonOp(dictionary_t                            & a_dictionary,
             string a_prefix):  EBMultigridLevel()
 {
   CH_TIME("EBPoissonOp::define");
+  m_prefix = a_prefix;
   getDToB();
   m_depth = 0;
   m_geoserv = a_geoserv;
-  m_prefix = a_prefix;
   m_alpha      = a_alpha;      
   m_beta       = a_beta;       
   m_dx         = a_dx;         
@@ -200,7 +200,6 @@ EBPoissonOp(dictionary_t                            & a_dictionary,
   //need the volume fraction in a data holder so we can evaluate kappa*alpha I 
   fillKappa(a_geoserv);
 
-  getDToB();
   defineCoarserObjects(a_geoserv);
   if(!m_hasCoarser || m_directToBottom)
   {
@@ -231,7 +230,6 @@ defineCoarserObjects(shared_ptr<GeometryService<2> >   & a_geoserv)
     }
     
     m_coarser = shared_ptr<EBPoissonOp>(new EBPoissonOp());
-    getDToB();
     m_coarser->define(*this, a_geoserv);
 
     const shared_ptr<LevelData<EBGraph>  > graphs = a_geoserv->getGraphs(m_coarser->m_domain);
@@ -247,6 +245,7 @@ define(const EBMultigridLevel            & a_finerLevel,
 {
   PR_TIME("sgmglevel::constructor");
   m_depth = a_finerLevel.m_depth + 1;
+  m_prefix = a_finerLevel.m_prefix;
   getDToB();
   m_geoserv = a_geoserv;
   m_dx         = 2*a_finerLevel.m_dx;         
@@ -280,8 +279,6 @@ define(const EBMultigridLevel            & a_finerLevel,
   //should not need the neumann one for coarser levels as TGA only calls it on finest level
   fillKappa(a_geoserv);
 
-
-  getDToB();
   defineCoarserObjects(a_geoserv);
   if(!m_hasCoarser || m_directToBottom)
   {
