@@ -1,4 +1,4 @@
 -ksp_converged_reason
 -ksp_max_it 10000
 -ksp_rtol 1.0e-16
--pc_type hypre
+-pc_type gamg

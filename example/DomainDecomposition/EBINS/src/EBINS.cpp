@@ -227,6 +227,7 @@ run(unsigned int a_max_step,
     Real         a_coveredVal)
 {
   CH_TIME("EBINS::run");
+  pout() << "inside run" << endl;
   m_step = a_startingStep;
   m_time = a_startingTime;
   //Welcome to our standard interface that is at least not over specified.

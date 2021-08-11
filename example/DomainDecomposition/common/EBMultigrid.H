@@ -127,15 +127,13 @@ public:
   {
     m_alpha = a_alpha;
     m_beta  = a_beta;
-    bool directToBottom = false;
-    ParmParse pp(m_prefix.c_str());
-    pp.query("direct_to_bottom_solve", directToBottom);
+    getDToB();
       
     if(m_hasCoarser)
     {
       m_coarser->resetAlphaAndBeta(a_alpha, a_beta);
     }
-    if(!m_hasCoarser || directToBottom)
+    if(!m_hasCoarser || m_directToBottom)
     {
       this->defineBottomSolvers(m_geoserv);
     }
