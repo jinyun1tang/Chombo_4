@@ -54,7 +54,7 @@ solve(EBLevelBoxData<CELL, 1>       & a_phi,
 
     a_phi += m_cor;
     residual(m_res, a_phi, a_rhs, true);
-
+    
     resnormold = resnorm;
     resnorm = m_res.maxNorm(0);
 
@@ -359,6 +359,8 @@ residual(EBLevelBoxData<CELL, 1>       & a_res,
     Bx inputBox = resfab.inputBox();
     ebforall(inputBox, subtractRHS,  grbx, resfab, rhsfab);
   }
+
+  a_res.exchange(m_exchangeCopier);
 }
 /****/
 void
