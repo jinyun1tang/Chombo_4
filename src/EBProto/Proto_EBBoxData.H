@@ -427,7 +427,7 @@ namespace Proto
   }
 
 
-
+/*
 
 
 ///version that does not send the point to the function
@@ -462,6 +462,7 @@ namespace Proto
   template<typename Func, typename... Srcs>
   inline void ebforall(const Box& a_inputBox,
                        const Func & a_F,  const Box& a_box, Srcs&... a_srcs);
+*/
 }
 
 
