@@ -209,11 +209,11 @@ namespace Proto
                  EBIrregStruct<cent, data_t, ncomp> * a_dst,Srcs... a_srcs)
   {
     const int N = a_Nvec;
+
+#ifdef PROTO_CUDA
+    size_t smem = 0;
     unsigned int stride = 256;
     unsigned int blocks = (N+stride-1)/stride;
-
-    size_t smem = 0;
-#ifdef PROTO_CUDA
     protoLaunchKernelMemAsyncGPU(vec_indexer, blocks, stride, smem, protoGetCurrentStream,
       0, N, a_F, a_dst, a_srcs...);
 #else
@@ -229,11 +229,11 @@ namespace Proto
                    EBIrregStruct<cent, data_t, ncomp> * a_dst,Srcs... a_srcs)
   {
     const int N = a_Nvec;
+    
+#ifdef PROTO_CUDA
     unsigned int stride = 256;
     unsigned int blocks = (N+stride-1)/stride;
-    
     size_t smem = 0;
-#ifdef PROTO_CUDA
     protoLaunchKernelMemAsyncGPU(vec_indexer_i, blocks, stride, smem, protoGetCurrentStream,
       0, N, a_F, a_dst, a_srcs...);
 #else

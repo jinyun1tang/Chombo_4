@@ -177,6 +177,27 @@ unsigned int MinionedF(Var<Real, 1>    a_minion,
   return 0;
 }
 PROTO_KERNEL_END(MinionedF, Minioned)
+
+PROTO_KERNEL_START 
+unsigned int MinionedPtF(int a_pt[DIM],
+                         Var<Real, 1>    a_minion,
+                         Var<Real, 1>    a_scalar,
+                         Var<Real, 1>    a_source,
+                         Real a_dt)
+{
+  int i = a_pt[0];
+  int j = a_pt[1];
+  Real scal = a_scalar(0);
+  Real sour = a_source(0);
+  int ideb = 0;
+  if((i == 29) && (j==26))
+  {
+    ideb =1;
+  }
+  a_minion(0) = scal + 0.5*a_dt*sour;
+  return 0;
+}
+PROTO_KERNEL_END(MinionedPtF, MinionedPt)
 //// pick scalup = upwind scalar and define flux = scalup*faceVel
 ////
 PROTO_KERNEL_START 
