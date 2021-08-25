@@ -604,8 +604,11 @@ advanceSpecies(Real a_dt,
     pout() << "calling heat solver for variable "  << endl;
     //advance the parabolic equation
     Real thiscoef = m_diffusionCoefs[ispec];
-    m_heatSolverSpec->advanceOneStep(spec, sourcomp,
-                                     thiscoef, a_dt, a_tol, a_maxIter);
+    {
+      CH_TIME("heat_solve");
+      m_heatSolverSpec->advanceOneStep(spec, sourcomp,
+                                       thiscoef, a_dt, a_tol, a_maxIter);
+    }
 
   }
   pout() << "getting reaction rates and evolving species"   << endl;
