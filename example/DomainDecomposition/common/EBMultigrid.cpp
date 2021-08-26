@@ -200,7 +200,10 @@ EBPoissonOp(dictionary_t                            & a_dictionary,
   //need the volume fraction in a data holder so we can evaluate kappa*alpha I 
   fillKappa(a_geoserv);
 
-  defineCoarserObjects(a_geoserv);
+  if(!m_directToBottom)
+  {
+    defineCoarserObjects(a_geoserv);
+  }
   if(!m_hasCoarser || m_directToBottom)
   {
     defineBottomSolvers(a_geoserv);
@@ -279,7 +282,10 @@ define(const EBMultigridLevel            & a_finerLevel,
   //should not need the neumann one for coarser levels as TGA only calls it on finest level
   fillKappa(a_geoserv);
 
-  defineCoarserObjects(a_geoserv);
+  if(!m_directToBottom)
+  {
+    defineCoarserObjects(a_geoserv);
+  }
   if(!m_hasCoarser || m_directToBottom)
   {
     defineBottomSolvers(a_geoserv);
@@ -293,12 +299,19 @@ defineBottomSolvers(shared_ptr<GeometryService<2> >   & a_geoserv)
   m_relaxSolver = shared_ptr<EBRelaxSolver>(new EBRelaxSolver(this, m_grids, m_graphs, m_nghost));
 #ifdef CH_USE_PETSC
 
-  Point pghost= ProtoCh::getPoint(m_nghost);
-  EBPetscSolver<2>* ptrd = 
-    (new EBPetscSolver<2>(a_geoserv, m_dictionary, m_graphs, m_grids, m_domain,
-                          m_stenname, m_dombcname, m_ebbcname,
-                          m_dx, m_alpha, m_beta, pghost));
-  m_petscSolver = shared_ptr<EBPetscSolver<2> >(ptrd);
+  ParmParse pp(m_prefix.c_str());
+  string which_solver("relax");
+  pp.query("bottom_solver", which_solver);
+
+  if(which_solver == string("petsc"))
+  {
+    Point pghost= ProtoCh::getPoint(m_nghost);
+    EBPetscSolver<2>* ptrd = 
+      (new EBPetscSolver<2>(a_geoserv, m_dictionary, m_graphs, m_grids, m_domain,
+                            m_stenname, m_dombcname, m_ebbcname,
+                            m_dx, m_alpha, m_beta, pghost));
+    m_petscSolver = shared_ptr<EBPetscSolver<2> >(ptrd);
+  }
 #endif    
 }
 //need the volume fraction in a data holder so we can evaluate kappa*alpha I 

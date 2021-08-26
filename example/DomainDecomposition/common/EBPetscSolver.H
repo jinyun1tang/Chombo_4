@@ -489,14 +489,24 @@ private:
     }
 
     //decide which location maps to the first one of this proc
-#ifdef CH_MPI    
-    CH4_SPMD::gather<int>(m_numPtsAllProc, numPtsThisProc, 0);
-    CH4_SPMD::broadcast<Vector<int> >(  m_numPtsAllProc, 0);
-    int startgid = 0;
-    for(int iproc = 0; iproc < Chombo4::procID(); iproc++)
-    {
-      startgid += m_numPtsAllProc[iproc];
-    }
+#ifdef CH_MPI
+    MPI_Comm wcomm = Chombo_MPI::comm;
+    PetscInt data = numPtsThisProc;
+    PetscInt result;
+    MPI_Datatype mtype;
+    PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
+    MPI_Scan( &data, &result, 1, mtype, MPI_SUM, wcomm );
+    int startgid =  result - data;
+//    CH4_SPMD::gather<int>(m_numPtsAllProc, numPtsThisProc, 0);
+//    CH4_SPMD::broadcast<Vector<int> >(  m_numPtsAllProc, 0);
+//    int startgid = 0;
+//    for(int iproc = 0; iproc < Chombo4::procID(); iproc++)
+//    {
+//      startgid += m_numPtsAllProc[iproc];
+//    }
+    using Chombo4::pout;
+    using Chombo4::procID;
+    pout()  << "procID = " << procID() << ", numPtsThisProc = " << numPtsThisProc << ", startgid = " << startgid << endl;
 #else
     int startgid = 0;
 #endif
