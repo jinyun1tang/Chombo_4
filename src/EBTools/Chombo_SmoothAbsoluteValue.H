@@ -7,7 +7,8 @@
 #include "Proto_BaseIF.H"
 
 #include "Chombo_NamespaceHeader.H"
-
+using Proto::BaseIF;
+using Proto::IndexTM;
 ///
 /**
    Functions to take a smooth absolute value of the difference between two functions

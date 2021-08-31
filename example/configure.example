@@ -15,6 +15,7 @@ parser.add_argument('--prec',  choices=['SINGLE', 'DOUBLE'],help='precision [DOU
 parser.add_argument('--cuda', choices=['TRUE', 'FALSE'],help='CUDA on or off [FALSE]',default='FALSE')
 parser.add_argument('--hip', choices=['TRUE', 'FALSE'],help='HIP on or off [FALSE]',default='FALSE')
 parser.add_argument('--petsc', choices=['TRUE', 'FALSE'],help='PETSc on or off [FALSE]',default='FALSE')
+parser.add_argument('--stack', help='define how many GB to allocate to the stack', choices=['1GB', '2GB', '4GB'], default='4GB')
 
 args = parser.parse_args()
 
@@ -83,6 +84,13 @@ for t in targets:
 
     if(args.prec == 'DOUBLE'):
         f.write('\nCXXFLAGS += -DCH_USE_DOUBLE\n')
+
+    if args.stack == '1GB':
+      f.write('\nCXXFLAGS+= -DPR_STACK_ALLOC=1073741824')
+    elif args.stack == '2GB':
+      f.write('\nCXXFLAGS+= -DPR_STACK_ALLOC=2147483648')
+    elif args.stack == '4GB':
+      f.write('\nCXXFLAGS+= -DPR_STACK_ALLOC=4294967296')
 
     if(args.opt) == 'DEBUG':
         if(args.cuda == 'TRUE'):

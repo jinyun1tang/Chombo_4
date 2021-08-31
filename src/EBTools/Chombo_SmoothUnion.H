@@ -6,7 +6,7 @@
 #include "Proto_BaseIF.H"
 
 #include "Chombo_NamespaceHeader.H"
-
+using Proto::IndexTM;
 ///
 /**
    This implicit function is the maximum of two (of more) implicit
@@ -16,10 +16,10 @@
    For the maximum, it uses the smooth absolute value Ae(a,b) \approx |a-b|
    min(a,b) = 0.5*(a+b - | a-b |)
 */
-class SmoothUnion: public BaseIF
+class SmoothUnion: public Proto::BaseIF
 {
 public:
-
+  
   ///
   /**
      Constructor specifying any number of implicit functions as inputs.

@@ -95,11 +95,6 @@ public:
   void getDToB()
   {
     ParmParse pp(m_prefix);
-    int ideb  = 0;
-    if(m_prefix==string("mac_proj"))
-    {
-      ideb = 1;
-    }
     m_directToBottom = false;
     pp.query("direct_to_bottom_solve", m_directToBottom);
   }

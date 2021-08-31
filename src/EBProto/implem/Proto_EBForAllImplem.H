@@ -319,7 +319,7 @@ namespace Proto
     unsigned long long int boxfloops = a_num_flops_point*a_box.size();
 
     protoEBforall(a_F, a_box, a_srcs...);
-    protoDeviceSynchronize();
+//    protoDeviceSynchronize();
 
     PR_FLOPS(boxfloops);
   }

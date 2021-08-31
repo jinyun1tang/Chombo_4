@@ -6,7 +6,8 @@
 #include "Proto_BaseIF.H"
 
 #include "Chombo_NamespaceHeader.H"
-
+using Proto::IndexTM;
+using Proto::BaseIF;
 ///
 /**
    This implicit function is the maximum of two (of more) implicit
