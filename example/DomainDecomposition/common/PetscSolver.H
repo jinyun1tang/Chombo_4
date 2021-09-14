@@ -2,6 +2,7 @@
 #ifndef _Chombo4_PETSCSOLVER_H_
 #define _Chombo4_PETSCSOLVER_H_
 
+#ifdef CH_USE_PETSC
 #include "LinearSolver.H"
 #include "Chombo_parstream.H"
 #include "Chombo_LevelData.H"
@@ -42,7 +43,7 @@ namespace Chombo4
     /**
        Set Function F(u) = 0 and Jacobian dF(u)/du for nonlinear solves
     */
-#ifdef CH_USE_PETSC
+
     virtual void setFunctionAndJacobian( PetscErrorCode (*f)(SNES,Vec,Vec,void*),
 #if PETSC_VERSION_GE(3,5,0)
                                          PetscErrorCode (*j)(SNES,Vec,Mat,Mat,void*)
@@ -59,7 +60,7 @@ namespace Chombo4
       pout() << "      KSP:: iteration = " << it << " residual norm = " <<  rnorm << std::endl;
       return 0;
     }
-#endif
+
     //
     virtual void define( Real a_dx, bool a_homogeneous = true );     // convenience define
 
@@ -70,14 +71,10 @@ namespace Chombo4
 
     ///
 
-#ifdef CH_USE_PETSC
-  
     /**
        Solve
     */
     virtual void solve( T& a_phi, const T& a_rhs );
-#endif
-
 
 
     int solve_private(T& a_phi, const T& a_rhs);
@@ -88,12 +85,10 @@ namespace Chombo4
        the same as the actual operator.
     */
 
-#ifdef CH_USE_PETSC
   
     virtual void solve_mfree( T& a_phi, 
                               const T& a_rhs, 
                               LinearOp<T> *a_op );
-#endif
 
     int solve_mfree_private(T& a_phi, 
                             const T& a_rhs, 
@@ -104,25 +99,11 @@ namespace Chombo4
     T m_Lphi_mfree;
     bool m_mfree_homogeneous;
   
-#ifdef CH_USE_PETSC
-    static PetscErrorCode apply_mfree(Mat A, Vec x, Vec f);
-#endif
-    ///
 
     /**
        viewResidual
     */
     Real computeResidual( );
-
-#ifdef CH_USE_PETSC
-  
-    /**
-       apply
-    */
-    virtual int applyOp(T & a_phi, const T & a_rhs );
-#endif
-  
-
 
     /**
        set initial guess non-zero
@@ -132,25 +113,10 @@ namespace Chombo4
       m_nz_init_guess = b;
     }
 
-    /**
-       set initial guess non-zero
-    */
-    void setOptionsPrefix( const char prefix[] )
+    KSP getKSP()
     {
-#ifdef CH_USE_PETSC
-      if (m_ksp)
-      {
-        KSPSetOptionsPrefix(m_ksp,prefix);
-      }
-      else
-      {
-        strcpy(m_prestring, prefix); // should check len
-      }
-#endif
+      return m_ksp;
     }
-#ifdef CH_USE_PETSC
-    KSP getKSP() { return m_ksp; }
-#endif
 
     /**
        get an estimate of the number of nnz/row for matrix allocation
@@ -198,12 +164,10 @@ namespace Chombo4
   public:
     int resetOperator()
     {
-#ifdef CH_USE_PETSC
       if (m_defined == 2)
       {
         m_defined = 1;
       }
-#endif
       return 0;
     }
 
@@ -211,7 +175,6 @@ namespace Chombo4
     /**
        Infinity norm
     */
-    Real normInfinity( const T& a_phi ) const;
 
   protected:
     ///
@@ -225,7 +188,6 @@ namespace Chombo4
     }
 
     /* petsc data */
-#ifdef CH_USE_PETSC
   public:
     Mat m_mat;
     void *m_ctx; // pointer for nonlnear solver call backs
@@ -241,22 +203,22 @@ namespace Chombo4
 #else
     PetscErrorCode (*m_jacobian)(SNES,Vec,Mat*,Mat*,MatStructure*,void*);
 #endif
-#endif
+
   protected:
-    char m_prestring[32];
+    string m_prestring;
     bool m_null;
     bool m_nz_init_guess;
     LevelData<BaseFab<bool> > m_bccode;
   public:
     int setup_solver( const T& a_phi );
     int create_mat_vec( const T& a_phi );
-#ifdef CH_USE_PETSC
+
     LevelData<BaseFab<PetscInt> >  m_gids;
     PetscInt m_gid0;
     PetscErrorCode putPetscInChombo( T& a_phi, const Vec xx );
     PetscErrorCode putChomboInPetsc( Vec out, const T& a_phi );
     virtual int formMatrix( Mat, const T* =0, PetscInt my0=0, PetscInt nloc=0, PetscInt *d=0, PetscInt *o=0) = 0;
-#endif
+
     virtual BaseFab<Real>& getRegFab(T& a_fab, const DataIndex& a_datInd) = 0;
     const virtual BaseFab<Real>& getRegFab(const T& a_fab, const DataIndex& a_datInd) const = 0;
     const virtual BaseFab<Real>& getRegFab(const T& a_fab, const DataIndex& a_datInd, Box& a_box) const = 0;
@@ -265,6 +227,7 @@ namespace Chombo4
 
 
 }
+#endif
 
 #include "PetscSolverI.H"
 

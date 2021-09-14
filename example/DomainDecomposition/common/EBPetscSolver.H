@@ -1,13 +1,3 @@
-#ifdef CH_LANG_CC
-/*
- *      _______              __
- *     / ___/ /  ___  __ _  / /  ___
- *    / /__/ _ \/ _ \/  V \/ _ \/ _ \
- *    \___/_//_/\___/_/_/_/_.__/\___/
- *    Please refer to Copyright.txt, in Chombo's root directory.
- */
-#endif
-
 #ifndef _chombo_ebpetscsolver_H_
 #define _chombo_ebpetscsolver_H_
 
@@ -18,6 +8,8 @@
 #include "petscmat.h"
 #include "petscksp.h"
 #include "petscviewer.h"
+#include "Chombo_EBChombo.H"
+#include "Chombo_EBLevelBoxData.H"
 
 namespace Chombo4
 {
@@ -38,38 +30,78 @@ namespace Chombo4
 //     solve: alpha u - div( beta grad u) = f
 //         - alpha and beta are constants
 ////////////////////////////////////////////////////////////////////////
+  template <int order>
   class EBPetscSolver : public PetscSolver< EBLevelBoxData<CELL, 1> >
   {
   public:
-    EBPetscSolver();
-    virtual void define(LinearOp<EBLevelBoxData<CELL, 1> >* a_operator, bool a_homogeneous = false);
-    BaseFab<Real>& getRegFab(EBLevelBoxData<CELL, 1>& a_fab, const DataIndex& a_datInd)
+    typedef GraphConstructorFactory< EBBoxData<CELL, int, 1> >  devifactint_t;
+    typedef GraphConstructorFactory<EBHostData<CELL, int, 1> >  hostfactint_t;
+    typedef GraphConstructorFactory<EBHostData<CELL,Real, 1> > hostfactreal_t;
+    typedef EBDictionary<order, Real, CELL, CELL>                dictionary_t;
+
+    EBPetscSolver(const shared_ptr<GeometryService<order> >  & a_geoserv,
+                  const shared_ptr<dictionary_t           >  & a_ebdictionary,
+                  const shared_ptr<LevelData<EBGraph> >      & a_graphs,
+                  const Chombo4::DisjointBoxLayout                    & a_grids,
+                  const Chombo4::Box                                  & a_domain,
+                  string a_stencilName,
+                  string a_domainBCName[2*DIM],
+                  string a_ebbcName,
+                  string a_prestring,
+                  Real a_dx,   Real a_alpha, Real a_beta, Point a_ghost)
     {
-      BaseFab<Real>& fabref = a_fab[a_datInd].getSingleValuedFAB();
-      return fabref;
+      m_geoserv      =  a_geoserv;
+      m_ebdictionary =  a_ebdictionary;
+      m_graphs       =  a_graphs;
+      m_grids        =  a_grids;
+      m_domain       =  a_domain;
+      m_stencilName  =  a_stencilName;
+      m_dx           =  a_dx;
+      m_alpha        =  a_alpha;
+      m_beta         =  a_beta;
+      m_prestring    =  a_prestring;
+      for(int iface = 0; iface < 2*DIM; iface++)
+      {
+        m_domainBCName[iface] = a_domainBCName[iface];
+      }
+      m_ebbcName = a_ebbcName;
+    
+      m_ivghost      =    ProtoCh::getIntVect(a_ghost);
+      m_ptghost      =    a_ghost;
+      //create map of locations in space to matrix row.
+      defineGIDS();
+      //create space for a matrix and the necessary vectors.
+      createMatrixAndVectors();
+      //put actual values into the matrix
+      formMatrix();
+      setupSolver();
     }
-    const BaseFab<Real>& getRegFab(const EBLevelBoxData<CELL, 1>& a_fab, const DataIndex& a_datInd) const
+
+    virtual void define(LinearOp<EBLevelBoxData<CELL, 1> >* a_operator, bool a_homogeneous = false)
     {
-      const BaseFab<Real>& fabref = a_fab[a_datInd].getSingleValuedFAB();
-      return fabref;
+      PetscSolver<EBLevelBoxData<CELL, 1> >::define(a_operator, a_homogeneous);
+      m_op = static_cast<EBAMRPoissonOp*>(a_operator);
+      //We need to be sure it is EBAMRPoissonOp that is being passed in
+      // this is defined in AMRMultiGrid::define->a_factory.AMRnewOp with
+      //How to do a check?
+
+      //getting a pointer to the vofStencil
+      m_op->getVoFStencil(m_vofStencil);
+      m_op->getAlphaDiagWeight(m_alphaDiagWeight);
+      m_eblg = (*m_op).getEBLG();
+      m_finestEBISL= m_eblg.getEBISL();
+      m_domainBC = m_op->getDomainBC();
+
+      // m_op->getAlphaBeta(m_alpha,m_beta);//too early
     }
-    const BaseFab<Real>& getRegFab(const EBLevelBoxData<CELL, 1>& a_fab, const DataIndex& a_datInd, Box& a_box) const
-    {
-      const EBCellFAB& ebfab = a_fab[a_datInd];
-      const BaseFab<Real>& fabref = ebfab.getSingleValuedFAB();
-      a_box = ebfab.getRegion();
-      return fabref;
-    }
-    virtual void defineData(EBLevelBoxData<CELL, 1>& a_data, const EBLevelBoxData<CELL, 1>& a_phi)
-    {
-      IntVect idghosts = a_phi.ghostVect();
-      const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
-      EBCellFactory ebcellfact(m_finestEBISL);
-      a_data.define(dbl, 1, idghosts, ebcellfact);
-    }
+
     Real addBCrhsValue(const IntVect& a_iv, const EBLevelBoxData<CELL, 1>& a_phi, const DataIndex& a_datInd, const Real& coeff = 1);
     Real addBCdiagValue(const IntVect a_iv, const IntVect a_jv, const EBLevelBoxData<CELL, 1>& a_rhs, const DataIndex& a_datInd, const Real coeff);
+    
+  private:    
+    EBPetscSolver();
   protected:
+    
     ///
 /**
  // Limitations/Assumptions:
@@ -80,9 +112,30 @@ namespace Chombo4
                             PetscInt n=0, PetscInt z=0, 
                             PetscInt *d_nnz=0, PetscInt *o_nnz=0 );
   public:
-    Real m_alpha;
-    Real m_beta;
-    EBISLayout m_finestEBISL;
+    
+    shared_ptr<GeometryService<order> >  m_geoserv;
+    shared_ptr< dictionary_t>            m_ebdictionary;
+    shared_ptr<LevelData<EBGraph> >      m_graphs;
+    Chombo4::DisjointBoxLayout                    m_grids;
+    Chombo4::Box                                  m_domain;
+    Real                                 m_dx;
+  
+    string m_stencilName;
+    string m_domainBCName[2*DIM];
+    string m_ebbcName;
+
+    Vector<int> m_numPtsAllProc;
+    Point   m_ptghost;
+    IntVect m_ivghost;
+    Mat m_mat;
+    void *m_ctx; // pointer for nonlnear solver call backs
+
+    Vec m_xx, m_rr, m_bb;
+    SNES m_snes;
+    KSP m_ksp;
+    PetscInt m_defined;
+    Real m_alpha, m_beta;
+    
   private:
     //making them pointers since they only link to the items from EBAMRPoissonOp
     //these pointers are made const* since they shall not modify whoever they are pointing to, but can change their targets.
@@ -110,5 +163,5 @@ namespace Chombo4
     }
   };
 }
+#include "EBPetscSolverI.H"
 #endif
-#endif /*_PETSCSOLVER_H_*/

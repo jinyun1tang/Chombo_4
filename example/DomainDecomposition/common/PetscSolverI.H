@@ -1,6 +1,7 @@
 
 #ifndef _PETSCSOLVERI_H_
 #define _PETSCSOLVERI_H_
+#ifdef CH_USE_PETSC
 
 #include "Chombo_LevelData.H"
 #include "Chombo_BoxIterator.H"
@@ -33,7 +34,6 @@ namespace Chombo4
   {
     if ( m_defined )
     {
-#ifdef CH_USE_PETSC
       if (m_mat)
       {
         MatDestroy(&m_mat);
@@ -42,10 +42,8 @@ namespace Chombo4
       VecDestroy(&m_bb);
       VecDestroy(&m_xx);
       VecDestroy(&m_rr);
-#endif
       m_defined = 0;
     }
-#ifdef CH_USE_PETSC
     if ( m_ksp )
     {
       KSPDestroy( &m_ksp );
@@ -56,7 +54,6 @@ namespace Chombo4
       SNESDestroy( &m_snes );
       m_snes = 0;
     }
-#endif
   }
 // *******************************************************
   template <class T>
@@ -120,7 +117,6 @@ namespace Chombo4
   int PetscSolver<T>::create_mat_vec( const T& a_phi )
   {
     CH_TIME("PetscSolver::create_mat_vec");
-#ifdef CH_USE_PETSC
     const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
     DataIterator dit( dbl );
     PetscErrorCode ierr;
@@ -250,7 +246,7 @@ namespace Chombo4
     CH_TIMERS("PetscSolver::setup_solver");
     CH_TIMER("solve-setup-1st", t1);
     CH_TIMER("solve-setup-rest", t2);
-#ifdef CH_USE_PETSC
+
     const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
     DataIterator dit( dbl );
     PetscErrorCode ierr;
@@ -392,7 +388,7 @@ namespace Chombo4
 #endif
       CH_STOP(t2);
     }
-#endif
+
     return 0;
   }
 
@@ -405,7 +401,7 @@ namespace Chombo4
     CH_TIMER("formRHS", t2);
     CH_TIMER("solve", t3);
     CH_TIMER("output", t4);
-#ifdef CH_USE_PETSC
+
     const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
     PetscErrorCode ierr;
     const PetscInt nc = a_rhs.nComp();
@@ -505,32 +501,16 @@ namespace Chombo4
     ierr = putPetscInChombo( a_phi, m_xx );CHKERRQ(ierr);
     a_phi.exchange();
     CH_STOP(t4);
-#endif
+
     return 0;
   }
-#ifdef CH_USE_PETSC
-  template <class T>
-  PetscErrorCode PetscSolver<T>::apply_mfree(Mat A, Vec x, Vec f)
-  {
-    CH_TIME("PetscSolver::apply_mfree");
-    //Whenever I write any PETSc code, I look forward to pulling classes back from the void.
-    PetscFunctionBegin;
-    void *ctx;
-    MatShellGetContext(A, &ctx);
-    PetscSolver<T> *tthis = (PetscSolver<T> *)ctx;
-    tthis->putPetscInChombo( tthis->m_phi_mfree, x );
-    tthis->m_op_mfree->applyOp(tthis->m_Lphi_mfree,tthis->m_phi_mfree,tthis->m_homogeneous);
-    tthis->putChomboInPetsc(f, tthis->m_Lphi_mfree );
-    PetscFunctionReturn(0);
-  }
-#endif
+
   template <class T>
   int PetscSolver<T>::solve_mfree_private( T& a_phi,
                                            const T& a_rhs, 
                                            LinearOp<T> *a_op )
   {
     CH_TIME("PetscSolver::solve_mfree_private");
-#ifdef CH_USE_PETSC
 #ifdef CH_MPI
     MPI_Comm wcomm = Chombo_MPI::comm;
 #else
@@ -673,11 +653,9 @@ namespace Chombo4
     a_op->clear( m_phi_mfree);
     a_op->clear( m_Lphi_mfree);
     KSPDestroy( &ksp );
-#endif
     return 0;
   }
 
-#ifdef CH_USE_PETSC
 // *******************************************************
   template <class T>
   PetscErrorCode PetscSolver<T>::putPetscInChombo( T& a_phi, const Vec xx )
@@ -754,76 +732,6 @@ namespace Chombo4
 
     return 0;
   }
-#endif
 
-// *******************************************************
-//  computes m_bb - A m_xx, utility method (not used)
-//
-  template <class T>
-  Real PetscSolver<T>::computeResidual()
-  {
-    Vec tempVec;
-    LevelData<FArrayBox > Residual;
-    PetscScalar alpha = -1;
-    PetscErrorCode ierr;
-
-    ierr = VecDuplicate(m_xx, &tempVec);CHKERRQ(ierr);
-    ierr = MatMult(m_mat, m_xx, tempVec);CHKERRQ(ierr);
-    ierr = VecAXPY(tempVec,alpha,m_bb);CHKERRQ(ierr);
-
-    IntVect idghosts = m_gids.ghostVect();
-    const DisjointBoxLayout &dbl = m_gids.disjointBoxLayout();
-    Residual.define( dbl, 0, idghosts );
-
-    ierr = putPetscInChombo( Residual, tempVec );CHKERRQ(ierr);
-    VecDestroy( &tempVec );
-    Residual.exchange();
-
-    //viewBFR(&Residual );
-
-    return 0;
-  }
-
-// *******************************************************
-//  computes |phi|_inf
-//
-  template <class T>
-  Real PetscSolver<T>::normInfinity( const T& a_phi ) const
-  {
-    PetscErrorCode ierr;
-    PetscReal      norm;
-  
-    ierr = putPetscInChombo( a_phi, m_rr );     //CHKERRQ(ierr);
-    ierr = VecNorm(m_rr,NORM_INFINITY,&norm);CHKERRQ(ierr);
-    //viewBFR(&Residual );
-    return norm;
-  }
-
-// *******************************************************
-// PetscSolver<T>::applyOp
-//  apply the matrix - use for debugging
-//
-  template <class T>
-  int PetscSolver<T>::applyOp( T & a_out, const T & a_phi )
-  {
-    //const int nc = a_phi.nComp();
-    const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
-    DataIterator dit( dbl );
-    PetscErrorCode ierr;
-
-    // setup if needed
-    ierr = create_mat_vec( a_phi );
-
-    // add BC stuff to RHS (EB)
-    ierr = putChomboInPetsc( m_bb, a_phi );  CHKERRQ(ierr);
-
-    // apply op
-    ierr = MatMult( m_mat, m_bb, m_xx );  CHKERRQ(ierr);
-
-    // get data back to Chombo
-    ierr = putPetscInChombo( a_out, m_xx );     CHKERRQ(ierr);
-
-    return ierr;
-  }
 }
 #endif

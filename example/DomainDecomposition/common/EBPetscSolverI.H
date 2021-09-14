@@ -1,64 +1,19 @@
 
 #ifdef CH_USE_PETSC
 
-#include "Chombo_LevelData.H"
-#include "Chombo_BoxIterator.H"
-#include "Chombo_MayDay.H"
-#include "EBPetscSolver.H"
-
-#include "petsc.h"
-#include "petscmat.h"
-#include "petscksp.h"
-#include "petscviewer.h"
-#include <limits>
 namespace Chombo4
 {
-// *******************************************************
-  EBPetscSolver::
-  EBPetscSolver():
-    PetscSolver<EBLevelBoxData<CELL, 1> >(), m_alpha(0.), m_beta(1.0)
-  {}
 
 // *******************************************************
-  void
-  EBPetscSolver:
-  :define(LinearOp<EBLevelBoxData<CELL, 1> >* a_operator, bool a_homogeneous)
-  {
-    PetscSolver<EBLevelBoxData<CELL, 1> >::define(a_operator, a_homogeneous);
-    m_op = static_cast<EBAMRPoissonOp*>(a_operator);
-    //We need to be sure it is EBAMRPoissonOp that is being passed in
-    // this is defined in AMRMultiGrid::define->a_factory.AMRnewOp with
-    //How to do a check?
-
-    //getting a pointer to the vofStencil
-    m_op->getVoFStencil(m_vofStencil);
-    m_op->getAlphaDiagWeight(m_alphaDiagWeight);
-    m_eblg = (*m_op).getEBLG();
-    m_finestEBISL= m_eblg.getEBISL();
-    m_domainBC = m_op->getDomainBC();
-
-    // m_op->getAlphaBeta(m_alpha,m_beta);//too early
-  }
 
 ///
+  template <unsigned int order>
   int
-  EBPetscSolver::
+  EBPetscSolver<order>::
   formMatrix( Mat a_mat, const EBLevelBoxData<CELL, 1> *a_phi,
               PetscInt my0, PetscInt nloc,
               PetscInt *d_nnz, PetscInt *o_nnz )
   {
-    // a_phi (nei, a_rhs) is not const because it needs to be modified to accomodate domain BCs,
-    // which are brought into rhs
-    // It modified
-    // this is only intended to be used at the finest level, 
-    // i.e., where there are no multi-valued cells
-    // Do a check to ensure this
-    // Limitations/Assumptions:
-    // Only for Pressure (MAC or CC Projector)
-    // Assumes Neumann BCs have derivative == 0
-    //
-    // This does not apprear to be entirly correct, a_phi is not modifed as far as see.  
-    // It is uses to get the templated FAB - mfa
 
     CH_TIME("EBPetscSolver::formMatrix");
 
@@ -78,15 +33,6 @@ namespace Chombo4
     // Real zero=0.;
     Real diagWeight =0.;
  
-    //const ProblemDomain& pDomain = m_eblg.getDomain();
-    //const Box& pBox = pDomain.domainBox();
-
-// #ifdef CH_MPI
-//   //int result;
-//   MPI_Comm wcomm = Chombo_MPI::comm;
-// #else
-//   MPI_Comm wcomm = PETSC_COMM_SELF;
-// #endif
 
     DataIterator dit = this->m_gids.dataIterator();
     int nbox=dit.size();
@@ -247,24 +193,13 @@ namespace Chombo4
       pout()  << ob[num_b-3] << endl;
     }
 
-#if 0
-    if( !d_nnz ) {
-      PetscViewer viewer;
-//  PetscViewerASCIIOpen( Chombo_MPI::comm, "A.m", &viewer);
-      PetscViewerBinaryOpen( Chombo_MPI::comm, "A.m",FILE_MODE_WRITE,&viewer);
-      PetscViewerSetFormat(viewer,PETSC_VIEWER_ASCII_MATLAB);
-      MatView( a_mat, viewer );
-      PetscViewerDestroy(&viewer);
-      MPI_Barrier(Chombo_MPI::comm);
-      exit(12);
-    }
-#endif
     return 0;
   }
 
 ////////////////////
+  template <unsigned int order>
   Real
-  EBPetscSolver::
+  EBPetscSolver<order>::
   addBCdiagValue(const IntVect a_iv, const IntVect a_jv, const EBLevelBoxData<CELL, 1>& a_phi, const DataIndex& a_datInd, const Real coeff)
   //Bring BC into diag
   //rhsAdd may get modified in someone else's addBCdiagValue, but not here
@@ -289,8 +224,9 @@ namespace Chombo4
 //
 // EBPetscSolver::addBCrhsValue
 //
+  template <unsigned int order>
   Real 
-  EBPetscSolver::
+  EBPetscSolver<order>::
   addBCrhsValue(const IntVect& a_iv, const EBLevelBoxData<CELL, 1>& a_phi, const DataIndex& a_datInd, const Real& coeff)
   //Bring BC into RHS of matrix
   //one cell can have multiple types of BCs if they are at the domain corner
