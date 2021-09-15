@@ -30,7 +30,7 @@ namespace Chombo4
 //     solve: alpha u - div( beta grad u) = f
 //         - alpha and beta are constants
 ////////////////////////////////////////////////////////////////////////
-  template <int order>
+  template <unsigned int order>
   class EBPetscSolver : public PetscSolver< EBLevelBoxData<CELL, 1> >
   {
   public:
@@ -100,6 +100,10 @@ namespace Chombo4
     
   private:    
     EBPetscSolver();
+    virtual PetscErrorCode putPetscInChombo( EBLevelBoxData<CELL, 1>& a_phi, const Vec xx );
+    virtual PetscErrorCode putChomboInPetsc( Vec out, const EBLevelBoxData<CELL, 1>& a_phi );
+    virtual int formMatrix( Mat, const EBLevelBoxData<CELL, 1>* =0, PetscInt my0=0, PetscInt nloc=0, PetscInt *d=0, PetscInt *o=0);
+    virtual int solve_private(EBLevelBoxData<CELL, 1>& a_phi, const EBLevelBoxData<CELL, 1>& a_rhs);
   protected:
     
     ///

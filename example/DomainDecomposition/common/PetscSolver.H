@@ -77,7 +77,6 @@ namespace Chombo4
     virtual void solve( T& a_phi, const T& a_rhs );
 
 
-    int solve_private(T& a_phi, const T& a_rhs);
     ///
     /**
        Solve a_op*a_phi = a_rhs using the PETSC matrix free functions
@@ -215,13 +214,12 @@ namespace Chombo4
 
     LevelData<BaseFab<PetscInt> >  m_gids;
     PetscInt m_gid0;
-    PetscErrorCode putPetscInChombo( T& a_phi, const Vec xx );
-    PetscErrorCode putChomboInPetsc( Vec out, const T& a_phi );
+    //private derived class functions that need to be there
+    virtual PetscErrorCode putPetscInChombo( T& a_phi, const Vec xx )  = 0;
+    virtual PetscErrorCode putChomboInPetsc( Vec out, const T& a_phi ) = 0;
     virtual int formMatrix( Mat, const T* =0, PetscInt my0=0, PetscInt nloc=0, PetscInt *d=0, PetscInt *o=0) = 0;
+    virtual int solve_private(T& a_phi, const T& a_rhs) = 0;
 
-    virtual BaseFab<Real>& getRegFab(T& a_fab, const DataIndex& a_datInd) = 0;
-    const virtual BaseFab<Real>& getRegFab(const T& a_fab, const DataIndex& a_datInd) const = 0;
-    const virtual BaseFab<Real>& getRegFab(const T& a_fab, const DataIndex& a_datInd, Box& a_box) const = 0;
     void setNull( bool n = true );
   };
 

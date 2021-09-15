@@ -283,5 +283,202 @@ namespace Chombo4
     return rhsAdd;
     // EB Cells are not supposed to access outside cells so there is nothing that needs to be added to RHS, it has already been coded into opStencil
   }
+// *******************************************************
+  template <unsigned int order>
+  int
+  EBPetscSolver<order>::
+  solve_private( EBLevelBoxData<CELL, 1>& a_phi,
+                 const EBLevelBoxData<CELL,1>& a_rhs )
+  {
+    CH_TIMERS("PetscSolver::solve_private");
+    CH_TIMER("formRHS", t2);
+    CH_TIMER("solve", t3);
+    CH_TIMER("output", t4);
+
+    const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
+    PetscErrorCode ierr;
+    const PetscInt nc = a_rhs.nComp();
+#ifdef CH_MPI
+    MPI_Comm wcomm = Chombo_MPI::comm;
+#else
+    MPI_Comm wcomm = PETSC_COMM_SELF;
+#endif
+    // setup if needed
+    ierr = setup_solver( a_phi );CHKERRQ(ierr);
+#ifdef CH_MPI
+    MPI_Barrier(Chombo_MPI::comm);
+#endif
+    CH_START(t2);
+    // form RHS -- m_bb
+    Real idx2 = 1.e0/(this->m_dx*this->m_dx);
+    Real addV;
+
+    //rhsOperation(a_rhs); 
+    // this is an interface in case some operations are needed on the rhs
+    // the default does nothing
+    ierr = VecSetOption(m_bb,VEC_IGNORE_OFF_PROC_ENTRIES,PETSC_TRUE);CHKERRQ(ierr);
+    ierr = VecSetOption(m_xx,VEC_IGNORE_OFF_PROC_ENTRIES,PETSC_TRUE);CHKERRQ(ierr);
+    // add X and B from Chombo to PETSc and add stuff for EB to B
+    ierr = VecSet( m_xx, 0.);CHKERRQ(ierr);
+    ierr = VecSet( m_bb, 0.);CHKERRQ(ierr);
+
+    DataIterator dit = a_rhs.dataIterator();
+    int nbox=dit.size();
+#pragma omp parallel for private(addV,ierr)
+    for (int mybox=0;mybox<nbox; mybox++)
+    {
+      const DataIndex& datInd = dit[mybox];
+      const BaseFab<Real> &rhsFab = getRegFab(a_rhs,datInd);
+      const BaseFab<Real> &xFab = getRegFab(a_phi,datInd);
+      const Box& box = dbl.get(datInd);
+      const BaseFab<PetscInt> &gidsFab = this->m_gids[datInd]; 
+      BoxIterator bit(box);
+      for (bit.begin(); bit.ok(); bit.next())
+      {
+        IntVect iv = bit();
+        PetscInt mm, ki = nc*gidsFab(iv,0);
+        for (mm=0;mm<nc;mm++,ki++)
+        {
+          PetscScalar v = rhsFab(iv,mm);
+          addV = addBCrhsValue(iv,a_phi,datInd,idx2);
+          if (addV == BaseFabRealSetVal)
+          {
+            v = 0;
+          }
+          else
+          {
+            v += addV;
+          }
+          ierr = VecSetValues(m_bb,1,&ki,&v,INSERT_VALUES);////CHKERRQ(ierr);
+          v = xFab(iv,mm);
+          ierr = VecSetValues(m_xx,1,&ki,&v,INSERT_VALUES);////CHKERRQ(ierr);
+        }
+      }
+    }//dit
+
+    ierr = VecAssemblyBegin( m_bb );CHKERRQ(ierr);
+    ierr = VecAssemblyEnd( m_bb );CHKERRQ(ierr);
+    //if (nonZeroInit)
+    //{
+    ierr = VecAssemblyBegin( m_xx );CHKERRQ(ierr);
+    ierr = VecAssemblyEnd( m_xx );CHKERRQ(ierr);
+    //}
+    CH_STOP(t2);
+    // null space for periodic BCs
+    if ( m_null )
+    {
+      MatNullSpace nullsp;
+      ierr = MatNullSpaceCreate(wcomm,PETSC_TRUE,0,PETSC_NULL,&nullsp);CHKERRQ(ierr);
+      CH_assert(m_ksp); // not used yet, needs fix for nonlinear
+      ierr = MatSetNullSpace( m_mat, nullsp );CHKERRQ(ierr);
+    }
+    // solve
+    CH_START(t3);
+#ifdef CH_MPI
+    MPI_Barrier(Chombo_MPI::comm);
+#endif
+//  VecView(m_bb,PETSC_VIEWER_STDOUT_WORLD);
+    if ( m_snes )
+    {
+      ierr = SNESSolve( m_snes, m_bb, m_xx );CHKERRQ(ierr);
+
+    }
+    else
+    {
+      ierr = KSPSolve( m_ksp, m_bb, m_xx );CHKERRQ(ierr);
+    }
+    CH_STOP(t3);
+    // put solution into output
+    CH_START(t4);
+//  VecView(m_xx,PETSC_VIEWER_STDOUT_WORLD);
+    ierr = putPetscInChombo( a_phi, m_xx );CHKERRQ(ierr);
+    a_phi.exchange();
+    CH_STOP(t4);
+
+    return 0;
+  }
+
+// *******************************************************
+  template <unsigned int order>
+  PetscErrorCode
+  EBPetscSolver::
+  putPetscInChombo(EBLevelBoxData<CELL, 1>& a_phi,
+                   const Vec xx )
+  {
+    PetscErrorCode ierr;
+    const PetscScalar *arr;
+    const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
+    const PetscInt nc = a_phi.nComp();
+
+    ierr = VecGetArrayRead(xx,&arr);  CHKERRQ(ierr);
+
+    DataIterator dit = a_phi.dataIterator();
+    int nbox=dit.size();
+    for (int mybox=0;mybox<nbox; mybox++)
+    {
+      const DataIndex& datInd = dit[mybox];
+      BaseFab<Real> &phiFab = getRegFab(a_phi,datInd);
+      const Box& box = dbl.get(datInd);
+      const BaseFab<PetscInt> &gidsFab = this->m_gids[datInd]; 
+      BoxIterator bit(box);
+      for (bit.begin(); bit.ok(); bit.next())
+      {
+        IntVect iv = bit();
+        PetscInt mm, ki = nc*gidsFab(iv,0);
+        for (mm=0;mm<nc;mm++,ki++)
+        {
+          phiFab(iv,mm) = arr[ki - nc*m_gid0];
+        }
+      }
+    }
+    ierr =  VecRestoreArrayRead(xx,&arr); CHKERRQ(ierr);
+    return 0;
+  }
+
+// *******************************************************
+  template <unsigned int order>
+  PetscErrorCode
+  EBPetscSolver<order>::putChomboInPetsc( Vec out, const EBLevelBoxData<CELL, 1>& a_phi )
+  {
+    CH_TIME("PetscSolver::putChomboInPetsc");
+
+    PetscErrorCode ierr;
+    const DisjointBoxLayout &dbl = a_phi.disjointBoxLayout();
+    const PetscInt nc = a_phi.nComp();
+    Real idx2 = 1.e0/(this->m_dx*this->m_dx);
+
+    // add BC stuff to RHS (EB)
+    ierr = VecSet( out, 0.);  CHKERRQ(ierr);
+
+    DataIterator dit = a_phi.dataIterator();
+    int nbox=dit.size();
+    for (int mybox=0;mybox<nbox; mybox++)
+    {
+      const DataIndex& datInd = dit[mybox];
+      const BaseFab<Real> &phiFab = getRegFab(a_phi,datInd);
+      const Box& box = dbl.get(datInd);
+      const BaseFab<PetscInt> &gidsFab = this->m_gids[datInd]; 
+      BoxIterator bit(box);
+      for (bit.begin(); bit.ok(); bit.next())
+      {
+        IntVect iv = bit();
+        PetscInt mm, ki = nc*gidsFab(iv,0);
+        for (mm=0;mm<nc;mm++,ki++)
+        {
+          PetscScalar v = phiFab(iv,mm);
+          v += addBCrhsValue(iv,a_phi,datInd,idx2);
+          if (std::isnan(v)) v = 0;
+          ierr = VecSetValues(out,1,&ki,&v,INSERT_VALUES);
+        }
+      }//bit
+    }//dit
+
+    ierr = VecAssemblyBegin( out );  CHKERRQ(ierr);
+    ierr = VecAssemblyEnd( out );  CHKERRQ(ierr);
+
+    return 0;
+  }
+
+}
 }
 #endif //CH_USE_PETSC
