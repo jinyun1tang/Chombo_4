@@ -168,33 +168,6 @@ namespace Chombo4
       PetscInt nnzrow = getNNZPerRow();
       PetscInt *d_nnz=PETSC_NULL, *o_nnz=PETSC_NULL;
       
-      if ( supportNNZExact() )
-      {
-        PetscInt nglobal;
-#ifdef CH_MPI
-        PetscInt nn = NN;
-        MPI_Comm wcomm = Chombo_MPI::comm;
-        MPI_Datatype mtype;
-        PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
-        MPI_Allreduce(&nn,&nglobal,1,mtype,MPI_SUM,wcomm);
-#else
-        nglobal = NN;
-#endif    
-        ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &d_nnz ); CHKERRQ(ierr);
-        ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &o_nnz ); CHKERRQ(ierr);
-        for (PetscInt kk=0;kk<NN;kk++) d_nnz[kk] = o_nnz[kk] = 0;
-
-        ierr = formMatrix( m_mat, &a_phi, nc*m_gid0, NN, d_nnz, o_nnz  ); CHKERRQ(ierr);
-        CH_assert(!m_mat);
-        // fix bounds
-        for (PetscInt kk=0;kk<NN;kk++) 
-        {
-          if (d_nnz[kk] > NN) d_nnz[kk] = NN;
-          if (o_nnz[kk] > nglobal-NN) o_nnz[kk] = nglobal-NN;
-        }
-        nnzrow = 0;
-      }
-
       ierr = MatCreate(wcomm,&m_mat);CHKERRQ(ierr);
       ierr = MatSetOptionsPrefix(m_mat,"");CHKERRQ(ierr);
 
@@ -221,7 +194,7 @@ namespace Chombo4
       ierr = VecDuplicate( m_bb, &m_rr ); CHKERRQ(ierr);
       //ierr = VecDuplicate( m_bb, &m_xx ); CHKERRQ(ierr);
     }
-#endif
+
     return 0;
   }
 
