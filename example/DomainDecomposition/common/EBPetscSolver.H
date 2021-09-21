@@ -63,15 +63,80 @@ public:
     
     m_ivghost      =    ProtoCh::getIntVect(a_ghost);
     m_ptghost      =    a_ghost;
-    //create map of locations in space to matrix row.
-    defineGIDS();
-    //create space for a matrix and the necessary vectors.
-    createMatrixAndVectors();
-    //put actual values into the matrix
-    formMatrix();
-    setupSolver();
+    m_defined      = 0;
   }
 
+  bool supportNNZExact() const
+  {
+    return true;
+  }
+  
+  void
+  doNNZExactSetup()
+  {
+    // create matrix
+    PetscInt nnzrow = getNNZPerRow();
+    PetscInt *d_nnz=PETSC_NULL, *o_nnz=PETSC_NULL;
+    
+    if ( supportNNZExact() )
+    { 
+      PetscInt nglobal;
+#ifdef CH_MPI
+      PetscInt nn = m_numPtsThisProc;
+      MPI_Comm wcomm = Chombo_MPI::comm;
+      MPI_Datatype mtype;
+      PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
+      MPI_Allreduce(&nn,&nglobal,1,mtype,MPI_SUM,wcomm);
+#else
+      nglobal = NN;
+      MPI_Comm wcomm = PETSC_COMM_SELF;
+#endif
+      PetscInt ierr;
+      int nc  = 1;
+      const PetscInt NN = nc*m_numPtsThisProc;
+      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &d_nnz ); CHKERRQ(ierr);
+      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &o_nnz ); CHKERRQ(ierr);
+      for (PetscInt kk=0;kk<NN;kk++) d_nnz[kk] = o_nnz[kk] = 0;
+
+      ierr = formMatrix();
+      CH_assert(!m_mat);
+      // fix bounds
+      for (PetscInt kk=0;kk<NN;kk++) 
+      {
+        if (d_nnz[kk] > NN) d_nnz[kk] = NN;
+        if (o_nnz[kk] > nglobal-NN) o_nnz[kk] = nglobal-NN;
+      }
+      nnzrow = 0;
+    }
+  }
+  int create_mat_vec()
+  {
+    CH_TIME("EBPetscSolver::create_mat_vec");
+
+    Chombo4::DataIterator dit(m_grids);
+    PetscErrorCode ierr;
+    const PetscInt nc = 1;
+#ifdef CH_MPI
+    MPI_Comm wcomm = Chombo_MPI::comm;
+#else
+    MPI_Comm wcomm = PETSC_COMM_SELF;
+#endif
+
+    if ( !m_mat )
+    {
+      // print_memory_line("Before AMG set up");
+      m_defined = 2;
+ 
+   
+      //create map of locations in space to matrix row.
+      defineGIDS();
+      doNNZExactSetup();
+      //create space for a matrix and the necessary vectors.
+      createMatrixAndVectors();
+      return 0;
+    }
+  }
+  
   virtual
   PetscErrorCode
   solve(EBLevelBoxData<CELL, 1>       & a_phi,
@@ -82,6 +147,14 @@ public:
     auto dbl = m_grids;
 
     PetscErrorCode ierr;
+
+#ifdef CH_MPI
+    MPI_Comm wcomm = Chombo_MPI::comm;
+#else
+    MPI_Comm wcomm = PETSC_COMM_SELF;
+#endif
+    // setup if needed
+    ierr = setup_solver( );CHKERRQ(ierr);
     
     // this is an interface in case some operations are needed on the rhs
     // the default does nothing
@@ -91,11 +164,11 @@ public:
     ierr = VecSet( m_xx, 0.);CHKERRQ(ierr);
     ierr = VecSet( m_bb, 0.);CHKERRQ(ierr);
 
+    //vecassembly begin/end happen here
     chomboToPetsc(m_bb, a_rhs);
     chomboToPetsc(m_xx, a_phi);
     // solve
 #ifdef CH_MPI
-    MPI_Comm wcomm = Chombo_MPI::comm;
     //with all the host to device and device to host stuff going on, this is probably
     //unnessary.   The peTsC team, however, tells me that the communication between
     //host and device will unnecessary soon so I left the barrier in the code.
@@ -301,90 +374,119 @@ private:
   virtual PetscInt formMatrix()
   {
     
-    {
-      using Chombo4::DataIterator;
-      char str[256];
-      strcpy (str,"-");
-      strcat (str,m_prestring);
+    using Chombo4::DataIterator;
+    char str[256];
+    strcpy (str,"-");
+    strcat (str,m_prestring);
 #if PETSC_VERSION_GE(3,6,0)
-      strcat (str,"pc_gamg_square_graph 20");
+    strcat (str,"pc_gamg_square_graph 20");
 #else
-      strcat (str,"pc_gamg_square_graph true");
+    strcat (str,"pc_gamg_square_graph true");
 #endif
-      PetscInt  ierr;
+    PetscInt  ierr;
 #if PETSC_VERSION_GE(3,7,0)
-      ierr = PetscOptionsInsertString(PETSC_NULL,str);CHKERRQ(ierr);
+    ierr = PetscOptionsInsertString(PETSC_NULL,str);CHKERRQ(ierr);
 #else
-      ierr = PetscOptionsInsertString(str);CHKERRQ(ierr);
+    ierr = PetscOptionsInsertString(str);CHKERRQ(ierr);
 #endif
-      DataIterator dit = m_grids.dataIterator();
-      for(int ibox = 0; ibox < dit.size(); ibox++)
-      {
-        vector< EBIndex<CELL> >            dstVoFs;
-        vector< Proto::LocalStencil<CELL, Real> > wstencil;
-        Stencil<Real>    regStencilInterior;
-        PointSet irregSet;
-        //use strings to get stencil for this particular operator.
-        getStencilComponents(dstVoFs, wstencil, regStencilInterior, irregSet, dit[ibox]);
+    DataIterator dit = m_grids.dataIterator();
+    for(int ibox = 0; ibox < dit.size(); ibox++)
+    {
+      vector< EBIndex<CELL> >            dstVoFs;
+      vector< Proto::LocalStencil<CELL, Real> > wstencil;
+      Stencil<Real>    regStencilInterior;
+      PointSet irregSet;
+      //use strings to get stencil for this particular operator.
+      getStencilComponents(dstVoFs, wstencil, regStencilInterior, irregSet, dit[ibox]);
         
-        auto& graph = (*m_graphs)[dit[ibox]];
-        auto  grid  =     m_grids[dit[ibox]];
-        Bx grbx = ProtoCh::getProtoBox(grid);
-        //add stencils for cells that are in the regular stencil regime to the irregular
-        //set.   This includes adjusting for boundary condtions
-        for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
+      auto& graph = (*m_graphs)[dit[ibox]];
+      auto  grid  =     m_grids[dit[ibox]];
+      Bx grbx = ProtoCh::getProtoBox(grid);
+      //add stencils for cells that are in the regular stencil regime to the irregular
+      //set.   This includes adjusting for boundary condtions
+      for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
+      {
+        auto pt = *bit;
+        if(graph.isCovered(pt))
         {
-          auto pt = *bit;
-          if(graph.isCovered(pt))
-          {
-            //do nothing
-          }
-          else if(!irregSet.contains(pt))
-          {
-            EBIndex<CELL> vof;
-            vof.defineAsRegular(pt);
-            LocalStencil<CELL, Real> regSten;
-            getLocalRegularStencil(regSten,  vof, regStencilInterior);
-            dstVoFs.push_back(vof);
-            wstencil.push_back(regSten);
-          }
+          //do nothing
         }
-        //now create the matrix
-        for(int ivof = 0; ivof < dstVoFs.size(); ivof++)
+        else if(!irregSet.contains(pt))
         {
-          auto vof    =   dstVoFs[ivof];
-          auto& stenc =  wstencil[ivof];
-          int irow = m_gids[dit[ibox]](vof, 0); 
-          for(int ivof = 0; ivof < stenc.size(); ivof++)
-          {
-            auto& stenvof = stenc.m_entries[ivof].m_vof;
-            auto& stenwgt = stenc.m_entries[ivof].m_weight;
-            Real weight = m_beta*stenwgt;
-            if(stenvof == vof)
-            {
-              weight += m_alpha;
-            }
-            int icol = m_gids[dit[ibox]](stenvof, 0);  
-            PetscInt irowpet = irow;
-            PetscInt icolpet = icol;
-            ierr = MatSetValues(m_mat,1,&irowpet,1,&icolpet,&weight,INSERT_VALUES);
-          } 
+          EBIndex<CELL> vof;
+          vof.defineAsRegular(pt);
+          LocalStencil<CELL, Real> regSten;
+          getLocalRegularStencil(regSten,  vof, regStencilInterior);
+          dstVoFs.push_back(vof);
+          wstencil.push_back(regSten);
         }
       }
+      //now create the matrix
+      for(int ivof = 0; ivof < dstVoFs.size(); ivof++)
+      {
+        auto vof    =   dstVoFs[ivof];
+        auto& stenc =  wstencil[ivof];
+        int irow = m_gids[dit[ibox]](vof, 0); 
+        for(int ivof = 0; ivof < stenc.size(); ivof++)
+        {
+          auto& stenvof = stenc.m_entries[ivof].m_vof;
+          auto& stenwgt = stenc.m_entries[ivof].m_weight;
+          Real weight = m_beta*stenwgt;
+          if(stenvof == vof)
+          {
+            weight += m_alpha;
+          }
+          int icol = m_gids[dit[ibox]](stenvof, 0);  
+          PetscInt irowpet = irow;
+          PetscInt icolpet = icol;
+          ierr = MatSetValues(m_mat,1,&irowpet,1,&icolpet,&weight,INSERT_VALUES);
+        } 
+      }
 
-      ierr = MatAssemblyBegin(m_mat,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-      ierr = MatAssemblyEnd(m_mat,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-
-    }
+//      if( !d_nnz )
+//      {
+        ierr = MatAssemblyBegin(m_mat,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr); 
+        ierr = MatAssemblyEnd(m_mat,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr); 
+      }
+//      else if(true)
+//      {
+//        const PetscInt num_b = 20;
+//        PetscInt ob[num_b],ib[num_b],m,n;
+//        for(m=0;m<num_b-1;m++) ob[m]=0; // bins
+//        for(PetscInt k=0;k<nloc;k++) {
+//          for(m=0,n=d_nnz[k]+o_nnz[k];m<num_b-1;m++) {
+//            n = n/2;
+//            if(n==0) { ob[m]++;  break; }
+//          }
+//          if(m==num_b-1) pout() << "HIT limit: " << (d_nnz[k]+o_nnz[k]) << endl;
+//        }
+//        ob[num_b-1] = nreg*nc; // real cells
+//        ob[num_b-2] = nloc;    // real cells
+//#ifdef CH_MPI
+//        MPI_Datatype mtype;
+//        PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
+//        MPI_Allreduce(ob,ib,num_b,mtype,MPI_SUM,PETSC_COMM_WORLD);
+//#else
+//        for(m=0;m<num_b;m++) ib[m] = ob[m]; 
+//#endif
+//        pout() << "NNZ bins: (regular cells = " << ib[num_b-1]/nc << ", " << (Real)ib[num_b-1]/(Real)(ib[num_b-2]/nc)*100. << " % regular)" << endl;
+//        pout() << "NNZ bin counts ";
+//        for(m=0;m<num_b-3;m++) pout() << ib[m]<< ", " ;
+//        pout()  << ib[num_b-3] << endl;
+//        for(m=0;m<num_b-3;m++) pout() << ob[m]<< ", " ;
+//        pout()  << ob[num_b-3] << endl;
+//      }
     return 0;
   }
+
+
   static PetscErrorCode ksp_monitor_pout(KSP ksp, PetscInt it, PetscReal rnorm  ,void *ctx)
   {
     using Chombo4::pout;
     pout() << "      KSP:: iteration = " << it << " residual norm = " <<  rnorm << std::endl;
     return 0;
   }
-  virtual PetscInt setupSolver()
+  virtual PetscInt setup_solver()
   {
     // create solvers
     PetscBool ism = PETSC_FALSE;
@@ -398,67 +500,75 @@ private:
 #else
     MPI_Comm wcomm = PETSC_COMM_SELF;
 #endif
-    // create the KSP so that we can set KSP parameters
-    KSPCreate( wcomm, &m_ksp );
-    PetscInt  ierr;
-    if ( strlen(m_prestring) > 0 )
+    if ( m_defined == 0 )
     {
-      ierr = KSPSetOptionsPrefix( m_ksp, m_prestring );    CHKERRQ(ierr);
-    }
-    ierr = KSPSetFromOptions(m_ksp);CHKERRQ(ierr);
-    if (ism)
-    {
-      ierr = KSPMonitorSet(m_ksp,ksp_monitor_pout,PETSC_NULL,PETSC_NULL); CHKERRQ(ierr);
-    }
-#if PETSC_VERSION_GE(3,5,0)
-    ierr = KSPSetOperators(m_ksp,m_mat,m_mat);CHKERRQ(ierr);
-#else
-    ierr = KSPSetOperators(m_ksp,m_mat,m_mat,SAME_NONZERO_PATTERN);CHKERRQ(ierr);
-#endif
-    //ierr = KSPSetInitialGuessNonzero(m_ksp, m_nz_init_guess ? PETSC_TRUE : PETSC_FALSE );CHKERRQ(ierr);
-
-    { // coordinates
-      PC pc; 
-      PetscInt sz,ind,bs,n,m;
-#if PETSC_VERSION_LT(3,4,0) & PETSC_VERSION_RELEASE
-      const PCType type;
-#else
-      PCType type;
-#endif  
-      ierr = KSPGetPC( m_ksp, &pc );     CHKERRQ(ierr);
-      ierr = PCGetType( pc, &type );    CHKERRQ(ierr);
-      ierr = MatGetBlockSize( m_mat, &bs );               CHKERRQ( ierr );
-      if ( strcmp(type,PCGAMG) == 0 && bs > 1 )
+      m_defined = 2;
+      // create the KSP so that we can set KSP parameters
+      KSPCreate( wcomm, &m_ksp );
+      PetscInt  ierr;
+      if ( strlen(m_prestring) > 0 )
       {
-        PetscReal    *coords;
-        ierr = MatGetLocalSize( m_mat, &m, &n );  CHKERRQ(ierr);
-        sz = CH_SPACEDIM*(m/bs);
-        ierr = PetscMalloc( (sz+1)*sizeof(PetscReal), &coords ); CHKERRQ(ierr);
-        ind  = 0;//just for parity check with sz
-        for (Chombo4::DataIterator  dit = m_grids.dataIterator(); dit.ok() ; ++dit )
+        ierr = KSPSetOptionsPrefix( m_ksp, m_prestring );    CHKERRQ(ierr);
+      }
+      ierr = KSPSetFromOptions(m_ksp);CHKERRQ(ierr);
+      if (ism)
+      {
+        ierr = KSPMonitorSet(m_ksp,ksp_monitor_pout,PETSC_NULL,PETSC_NULL); CHKERRQ(ierr);
+      }
+
+      { // coordinates
+        PC pc; 
+        PetscInt sz,ind,bs,n,m;
+#if PETSC_VERSION_LT(3,4,0) & PETSC_VERSION_RELEASE
+        const PCType type;
+#else
+        PCType type;
+#endif  
+        ierr = KSPGetPC( m_ksp, &pc );     CHKERRQ(ierr);
+        ierr = PCGetType( pc, &type );    CHKERRQ(ierr);
+        ierr = MatGetBlockSize( m_mat, &bs );               CHKERRQ( ierr );
+        if ( strcmp(type,PCGAMG) == 0 && bs > 1 )
         {
-          Chombo4::Box grid = m_grids[dit()];
-          for (Chombo4::BoxIterator bit(grid); bit.ok(); bit.next())
+          PetscReal    *coords;
+          ierr = MatGetLocalSize( m_mat, &m, &n );  CHKERRQ(ierr);
+          sz = CH_SPACEDIM*(m/bs);
+          ierr = PetscMalloc( (sz+1)*sizeof(PetscReal), &coords ); CHKERRQ(ierr);
+          ind  = 0;//just for parity check with sz
+          for (Chombo4::DataIterator  dit = m_grids.dataIterator(); dit.ok() ; ++dit )
           {
-            IntVect iv = bit(); // coordinate in any scaled, shifted, rotated frame.
-            for (PetscInt k=0; k< DIM; k++)
+            Chombo4::Box grid = m_grids[dit()];
+            for (Chombo4::BoxIterator bit(grid); bit.ok(); bit.next())
             {
-              ind = ind + 1;
-              coords[ind] = (PetscReal)iv[k];
+              IntVect iv = bit(); // coordinate in any scaled, shifted, rotated frame.
+              for (PetscInt k=0; k< DIM; k++)
+              {
+                ind = ind + 1;
+                coords[ind] = (PetscReal)iv[k];
+              }
             }
           }
+          CH_assert(ind==sz);
+          ierr = PCSetCoordinates( pc, CH_SPACEDIM, sz/CH_SPACEDIM, coords ); CHKERRQ(ierr);
+          ierr = PetscFree( coords );  CHKERRQ(ierr);
         }
-        CH_assert(ind==sz);
-        ierr = PCSetCoordinates( pc, CH_SPACEDIM, sz/CH_SPACEDIM, coords ); CHKERRQ(ierr);
-        ierr = PetscFree( coords );  CHKERRQ(ierr);
       }
     }
+    else if ( m_defined == 1 )
+    {
+      m_defined = 2;
+      // form A -- m_mat
+      PetscInt ierr;
+      ierr = MatZeroEntries( m_mat );        CHKERRQ(ierr);
+      ierr = formMatrix();     CHKERRQ(ierr);
 
-    // print_memory_line("After AMG set up");
-    //there is some stuff here about blocksize but it appears to be optional.
+#if PETSC_VERSION_GE(3,5,0)
+      ierr = KSPSetOperators(m_ksp,m_mat,m_mat); CHKERRQ(ierr);
+#else
+      ierr = KSPSetOperators(m_ksp,m_mat,m_mat,SAME_NONZERO_PATTERN); CHKERRQ(ierr);
+#endif
+    }
     return 0;
   }
-  
   virtual int getNNZPerRow() const
   {
     return 1000;
@@ -470,16 +580,47 @@ private:
     PetscInt nnzrow = getNNZPerRow();
     PetscInt *d_nnz=PETSC_NULL, *o_nnz=PETSC_NULL;
 #ifdef CH_MPI
-    MPI_Comm wcomm = Chombo_MPI::comm;
+      PetscInt nn = m_numPtsThisProc;
+      MPI_Comm wcomm = Chombo_MPI::comm;
 #else
-    MPI_Comm wcomm = PETSC_COMM_SELF;
+      MPI_Comm wcomm = PETSC_COMM_SELF;
+      nglobal = NN;
 #endif
-    int nc = 1;
+    if ( supportNNZExact() )
+    { 
+      PetscInt nglobal;
+      PetscInt NN = m_numPtsThisProc;
+#ifdef CH_MPI
+          PetscInt nn = NN;
+          MPI_Datatype mtype;
+          PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
+          MPI_Allreduce(&nn,&nglobal,1,mtype,MPI_SUM,wcomm);
+#else
+          nglobal = NN;
+#endif    
+
+      PetscInt ierr;
+
+      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &d_nnz ); CHKERRQ(ierr);
+      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &o_nnz ); CHKERRQ(ierr);
+      for (PetscInt kk=0;kk<NN;kk++) d_nnz[kk] = o_nnz[kk] = 0;
+
+      ierr = formMatrix(); CHKERRQ(ierr);
+      CH_assert(!m_mat);
+      // fix bounds
+      for (PetscInt kk=0;kk<NN;kk++) 
+      {
+        if (d_nnz[kk] > NN) d_nnz[kk] = NN;
+        if (o_nnz[kk] > nglobal-NN) o_nnz[kk] = nglobal-NN;
+      }
+      nnzrow = 0;
+    }
     PetscInt ierr;
     ierr = MatCreate(wcomm,&m_mat);CHKERRQ(ierr);
     ierr = MatSetOptionsPrefix(m_mat,"");CHKERRQ(ierr);
     
     ierr = MatSetSizes(m_mat,m_NN,m_NN,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
+    PetscInt nc = 1;
     ierr = MatSetBlockSize(m_mat,nc);CHKERRQ(ierr);
     ierr = MatSetType(m_mat,MATAIJ);CHKERRQ(ierr);
 
@@ -509,13 +650,14 @@ private:
   void defineGIDS()
   {
     using Chombo4::DataIterator;
-    IntVect gidghost = 4*IntVect::Unit;
+    IntVect gidghost = m_ivghost;
     m_gids.define(m_grids, 1, gidghost, hostfactint_t(m_graphs));
     DataIterator dit = m_grids.dataIterator();
     //get the number of points on each proc.
     int numPtsThisProc = 0;
     for(int ibox = 0; ibox < dit.size(); ibox++)
     {
+      m_gids[dit[ibox]].setVal(-1);
       auto graph = (*m_graphs)[dit[ibox]];
       auto grid  =     m_grids[dit[ibox]];
       Bx  grbx = ProtoCh::getProtoBox(grid);
@@ -525,8 +667,10 @@ private:
         numPtsThisProc += vofs.size();
       }
     }
+    
 
     //decide which location maps to the first one of this proc
+    m_numPtsThisProc = numPtsThisProc;
 #ifdef CH_MPI
     MPI_Comm wcomm = Chombo_MPI::comm;
     PetscInt data = numPtsThisProc;
@@ -599,6 +743,7 @@ private:
   SNES m_snes;
   KSP m_ksp;
   PetscInt m_defined;
+  PetscInt m_numPtsThisProc;
   char m_prestring[32];
   Real m_alpha, m_beta;
 };
