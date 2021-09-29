@@ -54,7 +54,7 @@ public:
     m_dx           =    a_dx;
     m_alpha        =    a_alpha;
     m_beta         =    a_beta;
-    m_prestring[0] = '\0';
+
     for(int iface = 0; iface < 2*DIM; iface++)
     {
       m_domainBCName[iface] = a_domainBCName[iface];
@@ -63,79 +63,18 @@ public:
     
     m_ivghost      =    ProtoCh::getIntVect(a_ghost);
     m_ptghost      =    a_ghost;
-    m_defined      = 0;
-  }
 
-  bool supportNNZExact() const
-  {
-    return true;
-  }
-  
-  void
-  doNNZExactSetup()
-  {
-    // create matrix
-    PetscInt nnzrow = getNNZPerRow();
-    PetscInt *d_nnz=PETSC_NULL, *o_nnz=PETSC_NULL;
-    
-    if ( supportNNZExact() )
-    { 
-      PetscInt nglobal;
+    m_mat          = 0;
+
 #ifdef CH_MPI
-      PetscInt nn = m_numPtsThisProc;
-      MPI_Comm wcomm = Chombo_MPI::comm;
-      MPI_Datatype mtype;
-      PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
-      MPI_Allreduce(&nn,&nglobal,1,mtype,MPI_SUM,wcomm);
+      wcomm = Chombo_MPI::comm;
 #else
-      nglobal = NN;
-      MPI_Comm wcomm = PETSC_COMM_SELF;
+      wcomm = PETSC_COMM_SELF;
 #endif
-      PetscInt ierr;
-      int nc  = 1;
-      const PetscInt NN = nc*m_numPtsThisProc;
-      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &d_nnz ); CHKERRQ(ierr);
-      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &o_nnz ); CHKERRQ(ierr);
-      for (PetscInt kk=0;kk<NN;kk++) d_nnz[kk] = o_nnz[kk] = 0;
-
-      ierr = formMatrix();
-      CH_assert(!m_mat);
-      // fix bounds
-      for (PetscInt kk=0;kk<NN;kk++) 
-      {
-        if (d_nnz[kk] > NN) d_nnz[kk] = NN;
-        if (o_nnz[kk] > nglobal-NN) o_nnz[kk] = nglobal-NN;
-      }
-      nnzrow = 0;
-    }
+      
+    setup_solver();
   }
-  int create_mat_vec()
-  {
-    CH_TIME("EBPetscSolver::create_mat_vec");
 
-    Chombo4::DataIterator dit(m_grids);
-    PetscErrorCode ierr;
-    const PetscInt nc = 1;
-#ifdef CH_MPI
-    MPI_Comm wcomm = Chombo_MPI::comm;
-#else
-    MPI_Comm wcomm = PETSC_COMM_SELF;
-#endif
-
-    if ( !m_mat )
-    {
-      // print_memory_line("Before AMG set up");
-      m_defined = 2;
- 
-   
-      //create map of locations in space to matrix row.
-      defineGIDS();
-      doNNZExactSetup();
-      //create space for a matrix and the necessary vectors.
-      createMatrixAndVectors();
-      return 0;
-    }
-  }
   
   virtual
   PetscErrorCode
@@ -148,25 +87,9 @@ public:
 
     PetscErrorCode ierr;
 
-#ifdef CH_MPI
-    MPI_Comm wcomm = Chombo_MPI::comm;
-#else
-    MPI_Comm wcomm = PETSC_COMM_SELF;
-#endif
-    // setup if needed
-    ierr = setup_solver( );CHKERRQ(ierr);
-    
-    // this is an interface in case some operations are needed on the rhs
-    // the default does nothing
-    ierr = VecSetOption(m_bb,VEC_IGNORE_OFF_PROC_ENTRIES,PETSC_TRUE);CHKERRQ(ierr);
-    ierr = VecSetOption(m_xx,VEC_IGNORE_OFF_PROC_ENTRIES,PETSC_TRUE);CHKERRQ(ierr);
-    // add X and B from Chombo to PETSc and add stuff for EB to B
-    ierr = VecSet( m_xx, 0.);CHKERRQ(ierr);
-    ierr = VecSet( m_bb, 0.);CHKERRQ(ierr);
-
     //vecassembly begin/end happen here
-    chomboToPetsc(m_bb, a_rhs);
-    chomboToPetsc(m_xx, a_phi);
+    chomboToPetsc(b, a_rhs);
+    chomboToPetsc(x, a_phi);
     // solve
 #ifdef CH_MPI
     //with all the host to device and device to host stuff going on, this is probably
@@ -174,19 +97,15 @@ public:
     //host and device will unnecessary soon so I left the barrier in the code.
     MPI_Barrier(wcomm);
 #endif
-    ierr = KSPSolve( m_ksp, m_bb, m_xx );CHKERRQ(ierr);
+    ierr = KSPSolve(ksp,b,x);CHKERRQ(ierr);
+
 
     // put solution into output
-    ierr = petscToChombo( a_phi, m_xx );CHKERRQ(ierr);
+    ierr = petscToChombo( a_phi, x );CHKERRQ(ierr);
     Chombo4::Copier styx;
     styx.exchangeDefine(m_grids, m_ivghost);
     a_phi.exchange(styx);
-    return 0;
-  }
-
-  void setInitialGuessNonzero( bool b = true )
-  {
-    m_nz_init_guess = b;
+    return ierr;
   }
 
   
@@ -327,6 +246,7 @@ private:
       a_allIrregPoints |= a_dstVoFs[ipt].m_pt;
     }
 
+
     return 0;
   }
 
@@ -375,20 +295,7 @@ private:
   {
     
     using Chombo4::DataIterator;
-    char str[256];
-    strcpy (str,"-");
-    strcat (str,m_prestring);
-#if PETSC_VERSION_GE(3,6,0)
-    strcat (str,"pc_gamg_square_graph 20");
-#else
-    strcat (str,"pc_gamg_square_graph true");
-#endif
-    PetscInt  ierr;
-#if PETSC_VERSION_GE(3,7,0)
-    ierr = PetscOptionsInsertString(PETSC_NULL,str);CHKERRQ(ierr);
-#else
-    ierr = PetscOptionsInsertString(str);CHKERRQ(ierr);
-#endif
+
     DataIterator dit = m_grids.dataIterator();
     for(int ibox = 0; ibox < dit.size(); ibox++)
     {
@@ -439,215 +346,75 @@ private:
           int icol = m_gids[dit[ibox]](stenvof, 0);  
           PetscInt irowpet = irow;
           PetscInt icolpet = icol;
-          ierr = MatSetValues(m_mat,1,&irowpet,1,&icolpet,&weight,INSERT_VALUES);
+          ierr = MatSetValues(A,1,&irowpet,1,&icolpet,&weight,INSERT_VALUES);
         } 
       }
 
-//      if( !d_nnz )
-//      {
-        ierr = MatAssemblyBegin(m_mat,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr); 
-        ierr = MatAssemblyEnd(m_mat,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr); 
-      }
-//      else if(true)
-//      {
-//        const PetscInt num_b = 20;
-//        PetscInt ob[num_b],ib[num_b],m,n;
-//        for(m=0;m<num_b-1;m++) ob[m]=0; // bins
-//        for(PetscInt k=0;k<nloc;k++) {
-//          for(m=0,n=d_nnz[k]+o_nnz[k];m<num_b-1;m++) {
-//            n = n/2;
-//            if(n==0) { ob[m]++;  break; }
-//          }
-//          if(m==num_b-1) pout() << "HIT limit: " << (d_nnz[k]+o_nnz[k]) << endl;
-//        }
-//        ob[num_b-1] = nreg*nc; // real cells
-//        ob[num_b-2] = nloc;    // real cells
-//#ifdef CH_MPI
-//        MPI_Datatype mtype;
-//        PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
-//        MPI_Allreduce(ob,ib,num_b,mtype,MPI_SUM,PETSC_COMM_WORLD);
-//#else
-//        for(m=0;m<num_b;m++) ib[m] = ob[m]; 
-//#endif
-//        pout() << "NNZ bins: (regular cells = " << ib[num_b-1]/nc << ", " << (Real)ib[num_b-1]/(Real)(ib[num_b-2]/nc)*100. << " % regular)" << endl;
-//        pout() << "NNZ bin counts ";
-//        for(m=0;m<num_b-3;m++) pout() << ib[m]<< ", " ;
-//        pout()  << ib[num_b-3] << endl;
-//        for(m=0;m<num_b-3;m++) pout() << ob[m]<< ", " ;
-//        pout()  << ob[num_b-3] << endl;
-//      }
-    return 0;
-  }
-
-
-  static PetscErrorCode ksp_monitor_pout(KSP ksp, PetscInt it, PetscReal rnorm  ,void *ctx)
-  {
-    using Chombo4::pout;
-    pout() << "      KSP:: iteration = " << it << " residual norm = " <<  rnorm << std::endl;
-    return 0;
-  }
-  virtual PetscInt setup_solver()
-  {
-    // create solvers
-    PetscBool ism = PETSC_FALSE;
-#if PETSC_VERSION_GE(3,7,0)
-    PetscOptionsGetBool(PETSC_NULL,m_prestring,"-ksp_monitor",&ism,PETSC_NULL);
-#else 
-    PetscOptionsGetBool(m_prestring,"-ksp_monitor",&ism,PETSC_NULL);
-#endif
-#ifdef CH_MPI
-    MPI_Comm wcomm = Chombo_MPI::comm;
-#else
-    MPI_Comm wcomm = PETSC_COMM_SELF;
-#endif
-    if ( m_defined == 0 )
-    {
-      m_defined = 2;
-      // create the KSP so that we can set KSP parameters
-      KSPCreate( wcomm, &m_ksp );
-      PetscInt  ierr;
-      if ( strlen(m_prestring) > 0 )
-      {
-        ierr = KSPSetOptionsPrefix( m_ksp, m_prestring );    CHKERRQ(ierr);
-      }
-      ierr = KSPSetFromOptions(m_ksp);CHKERRQ(ierr);
-      if (ism)
-      {
-        ierr = KSPMonitorSet(m_ksp,ksp_monitor_pout,PETSC_NULL,PETSC_NULL); CHKERRQ(ierr);
-      }
-
-      { // coordinates
-        PC pc; 
-        PetscInt sz,ind,bs,n,m;
-#if PETSC_VERSION_LT(3,4,0) & PETSC_VERSION_RELEASE
-        const PCType type;
-#else
-        PCType type;
-#endif  
-        ierr = KSPGetPC( m_ksp, &pc );     CHKERRQ(ierr);
-        ierr = PCGetType( pc, &type );    CHKERRQ(ierr);
-        ierr = MatGetBlockSize( m_mat, &bs );               CHKERRQ( ierr );
-        if ( strcmp(type,PCGAMG) == 0 && bs > 1 )
-        {
-          PetscReal    *coords;
-          ierr = MatGetLocalSize( m_mat, &m, &n );  CHKERRQ(ierr);
-          sz = CH_SPACEDIM*(m/bs);
-          ierr = PetscMalloc( (sz+1)*sizeof(PetscReal), &coords ); CHKERRQ(ierr);
-          ind  = 0;//just for parity check with sz
-          for (Chombo4::DataIterator  dit = m_grids.dataIterator(); dit.ok() ; ++dit )
-          {
-            Chombo4::Box grid = m_grids[dit()];
-            for (Chombo4::BoxIterator bit(grid); bit.ok(); bit.next())
-            {
-              IntVect iv = bit(); // coordinate in any scaled, shifted, rotated frame.
-              for (PetscInt k=0; k< DIM; k++)
-              {
-                ind = ind + 1;
-                coords[ind] = (PetscReal)iv[k];
-              }
-            }
-          }
-          CH_assert(ind==sz);
-          ierr = PCSetCoordinates( pc, CH_SPACEDIM, sz/CH_SPACEDIM, coords ); CHKERRQ(ierr);
-          ierr = PetscFree( coords );  CHKERRQ(ierr);
-        }
-      }
     }
-    else if ( m_defined == 1 )
-    {
-      m_defined = 2;
-      // form A -- m_mat
-      PetscInt ierr;
-      ierr = MatZeroEntries( m_mat );        CHKERRQ(ierr);
-      ierr = formMatrix();     CHKERRQ(ierr);
-
-#if PETSC_VERSION_GE(3,5,0)
-      ierr = KSPSetOperators(m_ksp,m_mat,m_mat); CHKERRQ(ierr);
-#else
-      ierr = KSPSetOperators(m_ksp,m_mat,m_mat,SAME_NONZERO_PATTERN); CHKERRQ(ierr);
-#endif
-    }
+    ierr = MatAssemblyBegin(A ,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr); 
+    ierr = MatAssemblyEnd(  A, MAT_FINAL_ASSEMBLY);CHKERRQ(ierr); 
     return 0;
   }
-  virtual int getNNZPerRow() const
+
+
+  void setup_solver()
   {
-    return 1000;
+    //this fills gids and gets number of points per proc and total
+    defineGIDS();
+
+    ierr = VecCreate(wcomm,&u);
+    ierr = VecSetSizes(u,PETSC_DECIDE,m_numPtsTotal);
+    ierr = VecSetFromOptions(u);
+    ierr = VecDuplicate(u,&b);
+    ierr = VecDuplicate(b,&x);
+
+    ierr = MatCreate(wcomm,&A);
+
+
+    ierr = MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,m_numPtsTotal,m_numPtsTotal);
+    ierr = MatSetFromOptions(A);
+
+    PetscInt maxNonZero = 500;
+    ierr = MatMPIAIJSetPreallocation(A,maxNonZero,NULL,maxNonZero,NULL);
+    ierr = MatSeqAIJSetPreallocation(A,maxNonZero,NULL);
+    ierr = MatSeqSBAIJSetPreallocation(A,1,maxNonZero,NULL);
+    ierr = MatMPISBAIJSetPreallocation(A,1,maxNonZero,NULL,maxNonZero,NULL);
+    ierr = MatMPISELLSetPreallocation(A,maxNonZero,NULL,maxNonZero,NULL);
+    ierr = MatSeqSELLSetPreallocation(A,maxNonZero,NULL);
+
+    formMatrix();
+
+    KSPCreate(wcomm,&ksp);
+
+    /*
+      Set operators. Here the matrix that defines the linear system
+      also serves as the preconditioning matrix.
+    */
+    ierr = KSPSetOperators(ksp,A,A);
+
+    /*
+      Set linear solver defaults for this problem (optional).
+      - By extracting the KSP and PC contexts from the KSP context,
+      we can then directly call any KSP and PC routines to set
+      various options.
+      - The following two statements are optional; all of these
+      parameters could alternatively be specified at runtime via
+      KSPSetFromOptions().  All of these defaults can be
+      overridden at runtime, as indicated below.
+    */
+    ierr = KSPSetTolerances(ksp,1.e-10,1.e-50,PETSC_DEFAULT,PETSC_DEFAULT);
+
+    /*
+      Set runtime options, e.g.,
+      -ksp_type <type> -pc_type <type> -ksp_monitor -ksp_rtol <rtol>
+      These options will override those specified above as long as
+      KSPSetFromOptions() is called _after_ any other customization
+      routines.
+    */
+    ierr = KSPSetFromOptions(ksp);
   }
   
-  PetscInt createMatrixAndVectors()
-  {
-    // create matrix
-    PetscInt nnzrow = getNNZPerRow();
-    PetscInt *d_nnz=PETSC_NULL, *o_nnz=PETSC_NULL;
-#ifdef CH_MPI
-      PetscInt nn = m_numPtsThisProc;
-      MPI_Comm wcomm = Chombo_MPI::comm;
-#else
-      MPI_Comm wcomm = PETSC_COMM_SELF;
-      nglobal = NN;
-#endif
-    if ( supportNNZExact() )
-    { 
-      PetscInt nglobal;
-      PetscInt NN = m_numPtsThisProc;
-#ifdef CH_MPI
-          PetscInt nn = NN;
-          MPI_Datatype mtype;
-          PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
-          MPI_Allreduce(&nn,&nglobal,1,mtype,MPI_SUM,wcomm);
-#else
-          nglobal = NN;
-#endif    
-
-      PetscInt ierr;
-
-      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &d_nnz ); CHKERRQ(ierr);
-      ierr = PetscMalloc( (NN+1)*sizeof(PetscInt), &o_nnz ); CHKERRQ(ierr);
-      for (PetscInt kk=0;kk<NN;kk++) d_nnz[kk] = o_nnz[kk] = 0;
-
-      ierr = formMatrix(); CHKERRQ(ierr);
-      CH_assert(!m_mat);
-      // fix bounds
-      for (PetscInt kk=0;kk<NN;kk++) 
-      {
-        if (d_nnz[kk] > NN) d_nnz[kk] = NN;
-        if (o_nnz[kk] > nglobal-NN) o_nnz[kk] = nglobal-NN;
-      }
-      nnzrow = 0;
-    }
-    PetscInt ierr;
-    ierr = MatCreate(wcomm,&m_mat);CHKERRQ(ierr);
-    ierr = MatSetOptionsPrefix(m_mat,"");CHKERRQ(ierr);
-    
-    ierr = MatSetSizes(m_mat,m_NN,m_NN,PETSC_DECIDE,PETSC_DECIDE);CHKERRQ(ierr);
-    PetscInt nc = 1;
-    ierr = MatSetBlockSize(m_mat,nc);CHKERRQ(ierr);
-    ierr = MatSetType(m_mat,MATAIJ);CHKERRQ(ierr);
-
-    ierr = MatSetFromOptions( m_mat ); CHKERRQ(ierr);
-    ierr = MatSeqAIJSetPreallocation(m_mat,nnzrow, d_nnz);CHKERRQ(ierr);
-    ierr = MatMPIAIJSetPreallocation(m_mat,nnzrow, d_nnz, nnzrow/2, o_nnz);CHKERRQ(ierr);
-    ierr = MatSetOption(m_mat,MAT_NEW_NONZERO_ALLOCATION_ERR,PETSC_FALSE) ;CHKERRQ(ierr);
-
-      
-    if ( d_nnz )
-    {
-      ierr = PetscFree( d_nnz );  CHKERRQ(ierr);
-      ierr = PetscFree( o_nnz );  CHKERRQ(ierr);
-    }
-
-    // create vectors
-    ierr = MatCreateVecs(m_mat,&m_bb,&m_xx);CHKERRQ(ierr);
-    //ierr = VecCreate( wcomm, &m_bb ); CHKERRQ(ierr);
-    //ierr = VecSetFromOptions( m_bb ); CHKERRQ(ierr);
-    //ierr = VecSetSizes( m_bb, m_NN, PETSC_DECIDE ); CHKERRQ(ierr);
-    ierr = VecDuplicate( m_bb, &m_rr ); CHKERRQ(ierr);
-    //ierr = VecDuplicate( m_bb, &m_xx ); CHKERRQ(ierr);
-
-    return 0;
-  }
-  
-  void defineGIDS()
+  PetscInt defineGIDS()
   {
     using Chombo4::DataIterator;
     IntVect gidghost = m_ivghost;
@@ -672,15 +439,21 @@ private:
     //decide which location maps to the first one of this proc
     m_numPtsThisProc = numPtsThisProc;
 #ifdef CH_MPI
-    MPI_Comm wcomm = Chombo_MPI::comm;
     PetscInt data = numPtsThisProc;
     PetscInt result;
     MPI_Datatype mtype;
     PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
     MPI_Scan( &data, &result, 1, mtype, MPI_SUM, wcomm );
     int startgid =  result - data;
-//    CH4_SPMD::gather<int>(m_numPtsAllProc, numPtsThisProc, 0);
-//    CH4_SPMD::broadcast<Vector<int> >(  m_numPtsAllProc, 0);
+
+    CH4_SPMD::gather<int>(m_numPtsAllProc, numPtsThisProc, 0);
+    CH4_SPMD::broadcast<Vector<int> >(  m_numPtsAllProc, 0);
+    m_numPtsTotal = 0;
+    for(int iproc = 0; iproc < m_numPtsAllProc.size(); iproc++)
+    {
+      m_numPtsTotal += m_numPtsAllProc[iproc];
+    }
+    
 //    int startgid = 0;
 //    for(int iproc = 0; iproc < Chombo4::procID(); iproc++)
 //    {
@@ -714,12 +487,13 @@ private:
     Chombo4::Copier exchangeCopier;
     exchangeCopier.exchangeDefine(m_grids, gidghost);
     m_gids.exchange(exchangeCopier);
+    return 0;
   }
+
   //index space--allows us to to matrix to solution space
   LevelData<EBHostData<CELL, int, 1> > m_gids;
   PetscInt m_gid0;
   PetscInt m_NN;
-  bool m_nz_init_guess;
 
 
   shared_ptr<GeometryService<order> >  m_geoserv;
@@ -736,15 +510,25 @@ private:
   Vector<int> m_numPtsAllProc;
   Point   m_ptghost;
   IntVect m_ivghost;
+
+  Vec            x,b,u;    /* approx solution, RHS, exact solution */
+  Mat            A;        /* linear system matrix */
+  KSP            ksp;      /* linear solver context */
+  PetscReal      norm;     /* norm of solution error */
+  PetscInt       i,j,Ii,J,Istart,Iend,its;
+  PetscErrorCode ierr;
+  PetscBool      flg;
+  PetscScalar    v;
+  MPI_Comm wcomm;
+
+  
   Mat m_mat;
   void *m_ctx; // pointer for nonlnear solver call backs
 
-  Vec m_xx, m_rr, m_bb;
-  SNES m_snes;
-  KSP m_ksp;
-  PetscInt m_defined;
+
   PetscInt m_numPtsThisProc;
-  char m_prestring[32];
+  PetscInt m_numPtsTotal;
+
   Real m_alpha, m_beta;
 };
 
