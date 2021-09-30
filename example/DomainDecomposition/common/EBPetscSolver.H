@@ -66,11 +66,7 @@ public:
 
     m_mat          = 0;
 
-#ifdef CH_MPI
-      wcomm = Chombo_MPI::comm;
-#else
-      wcomm = PETSC_COMM_SELF;
-#endif
+    wcomm = PETSC_COMM_WORLD;
       
     setup_solver();
   }
@@ -132,11 +128,12 @@ private:
       for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
       {
         auto pt = *bit;
+        IntVect iv = ProtoCh::getIntVect(pt);
         auto vofs = graph.getVoFs(pt);
         for(int ivof = 0; ivof < vofs.size(); ivof++)
         {
           auto vof = vofs[ivof];
-          PetscInt ki = m_gids[dit[ibox]](vof, 0);
+          PetscInt ki = m_gids[dit[ibox]](iv, 0);
           Real v = hostfab(vof, 0);
           ierr = VecSetValues(a_dst,1,&ki,&v,INSERT_VALUES);CHKERRQ(ierr);
         }
@@ -167,34 +164,34 @@ private:
       }
       else
       {
-        //compensate for neumann or dirichlet bcs
-        //here is where we diverge from canon.
-        //The original just ignored stuff outside the domain.
-        for(int idir = 0; idir < DIM; idir++)
-        {
-          for(SideIterator sit; sit.ok(); ++sit)
-          {
-            int isign = sign(sit());
-            Point justOutside = startpt + isign*Point::Basis(idir);
-            if(stenpt == justOutside)
-            {
-              int index = ebp_index(idir, sit());
-              string bcstr = m_domainBCName[index];
-              if(bcstr == StencilNames::Dirichlet)
-              {
-                a_localSten.add(a_vof, -coefs[isten]);
-              }
-              else if(bcstr == StencilNames::Neumann)
-              {
-                a_localSten.add(a_vof,  coefs[isten]);
-              }
-            }
-          }
-        }
+//        //compensate for neumann or dirichlet bcs
+//        //here is where we diverge from canon.
+//        //The original just ignored stuff outside the domain.
+//        for(int idir = 0; idir < DIM; idir++)
+//        {
+//          for(SideIterator sit; sit.ok(); ++sit)
+//          {
+//            int isign = sign(sit());
+//            Point justOutside = startpt + isign*Point::Basis(idir);
+//            if(stenpt == justOutside)
+//            {
+//              int index = ebp_index(idir, sit());
+//              string bcstr = m_domainBCName[index];
+//              if(bcstr == StencilNames::Dirichlet)
+//              {
+//                a_localSten.add(a_vof, -coefs[isten]);
+//              }
+//              else if(bcstr == StencilNames::Neumann)
+//              {
+//                a_localSten.add(a_vof,  coefs[isten]);
+//              }
+//            }
+//          }
       }
     }
   }
 
+        
   int getStencilComponents(vector< EBIndex<CELL> >             & a_dstVoFs, 
                            vector< Proto::LocalStencil<CELL, Real> >  & a_wstencil,
                            Proto::Stencil<Real>                       & a_regStencilInterior,
@@ -275,11 +272,12 @@ private:
       for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
       {
         auto pt = *bit;
+        IntVect iv = ProtoCh::getIntVect(pt);
         auto vofs = graph.getVoFs(pt);
         for(int ivof = 0; ivof < vofs.size(); ivof++)
         {
           auto vof = vofs[ivof];
-          PetscInt ki = m_gids[dit[ibox]](vof, 0);
+          PetscInt ki = m_gids[dit[ibox]](iv, 0);
           hostfab(vof, 0) = arr[ki];
         }
       }
@@ -295,18 +293,65 @@ private:
   {
     
     using Chombo4::DataIterator;
+    Stencil<Real>    regStencilInterior;
 
     DataIterator dit = m_grids.dataIterator();
+//    for(int ibox = 0; ibox < dit.size(); ibox++)
+//    {
+//      vector< EBIndex<CELL> >            dstVoFs;
+//      vector< Proto::LocalStencil<CELL, Real> > wstencil;
+//      PointSet irregSet;
+//      //use strings to get stencil for this particular operator.
+//      getStencilComponents(dstVoFs, wstencil, regStencilInterior, irregSet, dit[ibox]);
+//        
+//      auto& graph = (*m_graphs)[dit[ibox]];
+//      auto  grid  =     m_grids[dit[ibox]];
+//      Bx grbx = ProtoCh::getProtoBox(grid);
+//      //add stencils for cells that are in the regular stencil regime to the irregular
+//      //set.   This includes adjusting for boundary condtions
+//      for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
+//      {
+//        auto pt = *bit;
+//        if(graph.isCovered(pt))
+//        {
+//          //do nothing
+//        }
+//        else if(!irregSet.contains(pt))
+//        {
+//          EBIndex<CELL> vof;
+//          vof.defineAsRegular(pt);
+//          LocalStencil<CELL, Real> regSten;
+//          getLocalRegularStencil(regSten,  vof, regStencilInterior);
+//          dstVoFs.push_back(vof);
+//          wstencil.push_back(regSten);
+//        }
+//      }
+//      //now create the matrix
+//      for(int ivof = 0; ivof < dstVoFs.size(); ivof++)
+//      {
+//        auto vof    =   dstVoFs[ivof];
+//        auto& stenc =  wstencil[ivof];
+//        int irow = m_gids[dit[ibox]](vof, 0); 
+//        for(int ivof = 0; ivof < stenc.size(); ivof++)
+//        {
+//          auto& stenvof = stenc.m_entries[ivof].m_vof;
+//          auto& stenwgt = stenc.m_entries[ivof].m_weight;
+//          Real weight = m_beta*stenwgt;
+//          if(stenvof == vof)
+//          {
+//            weight += m_alpha;
+//          }
+//          int icol = m_gids[dit[ibox]](stenvof, 0);  
+//          PetscInt irowpet = irow;
+//          PetscInt icolpet = icol;
+//          ierr = MatSetValues(A,1,&irowpet,1,&icolpet,&weight,INSERT_VALUES);
+//        } 
+//      }
+//
+//    }
+
     for(int ibox = 0; ibox < dit.size(); ibox++)
     {
-      vector< EBIndex<CELL> >            dstVoFs;
-      vector< Proto::LocalStencil<CELL, Real> > wstencil;
-      Stencil<Real>    regStencilInterior;
-      PointSet irregSet;
-      //use strings to get stencil for this particular operator.
-      getStencilComponents(dstVoFs, wstencil, regStencilInterior, irregSet, dit[ibox]);
-        
-      auto& graph = (*m_graphs)[dit[ibox]];
       auto  grid  =     m_grids[dit[ibox]];
       Bx grbx = ProtoCh::getProtoBox(grid);
       //add stencils for cells that are in the regular stencil regime to the irregular
@@ -314,26 +359,14 @@ private:
       for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
       {
         auto pt = *bit;
-        if(graph.isCovered(pt))
-        {
-          //do nothing
-        }
-        else if(!irregSet.contains(pt))
-        {
-          EBIndex<CELL> vof;
-          vof.defineAsRegular(pt);
-          LocalStencil<CELL, Real> regSten;
-          getLocalRegularStencil(regSten,  vof, regStencilInterior);
-          dstVoFs.push_back(vof);
-          wstencil.push_back(regSten);
-        }
-      }
-      //now create the matrix
-      for(int ivof = 0; ivof < dstVoFs.size(); ivof++)
-      {
-        auto vof    =   dstVoFs[ivof];
-        auto& stenc =  wstencil[ivof];
-        int irow = m_gids[dit[ibox]](vof, 0); 
+        IntVect iv = ProtoCh::getIntVect(pt);
+        EBIndex<CELL> vof;
+        vof.defineAsRegular(pt);
+        LocalStencil<CELL, Real> regSten;
+        getLocalRegularStencil(regSten,  vof, regStencilInterior);
+        auto& stenc =  regSten;
+        
+        PetscInt irow = m_gids[dit[ibox]](iv, 0); 
         for(int ivof = 0; ivof < stenc.size(); ivof++)
         {
           auto& stenvof = stenc.m_entries[ivof].m_vof;
@@ -343,7 +376,7 @@ private:
           {
             weight += m_alpha;
           }
-          int icol = m_gids[dit[ibox]](stenvof, 0);  
+          PetscInt icol = m_gids[dit[ibox]](iv, 0);  
           PetscInt irowpet = irow;
           PetscInt icolpet = icol;
           ierr = MatSetValues(A,1,&irowpet,1,&icolpet,&weight,INSERT_VALUES);
@@ -363,7 +396,7 @@ private:
     defineGIDS();
 
     ierr = VecCreate(wcomm,&u);
-    ierr = VecSetSizes(u,PETSC_DECIDE,m_numPtsTotal);
+    ierr = VecSetSizes(u,PETSC_DECIDE,m_NN);
     ierr = VecSetFromOptions(u);
     ierr = VecDuplicate(u,&b);
     ierr = VecDuplicate(b,&x);
@@ -371,9 +404,13 @@ private:
     ierr = MatCreate(wcomm,&A);
 
 
-    ierr = MatSetSizes(A,PETSC_DECIDE,PETSC_DECIDE,m_numPtsTotal,m_numPtsTotal);
+    ierr = MatSetFromOptions(A);
+    ierr = MatSetSizes(A, m_NN, m_NN, PETSC_DECIDE,PETSC_DECIDE);
+    ierr = MatSetType( A, MATAIJ);
     ierr = MatSetFromOptions(A);
 
+    //petsc documentation says this preallocation stuff is optional.
+    //even the example crashes without it
     PetscInt maxNonZero = 500;
     ierr = MatMPIAIJSetPreallocation(A,maxNonZero,NULL,maxNonZero,NULL);
     ierr = MatSeqAIJSetPreallocation(A,maxNonZero,NULL);
@@ -417,82 +454,56 @@ private:
   PetscInt defineGIDS()
   {
     using Chombo4::DataIterator;
-    IntVect gidghost = m_ivghost;
-    m_gids.define(m_grids, 1, gidghost, hostfactint_t(m_graphs));
-    DataIterator dit = m_grids.dataIterator();
-    //get the number of points on each proc.
-    int numPtsThisProc = 0;
-    for(int ibox = 0; ibox < dit.size(); ibox++)
-    {
-      m_gids[dit[ibox]].setVal(-1);
-      auto graph = (*m_graphs)[dit[ibox]];
-      auto grid  =     m_grids[dit[ibox]];
-      Bx  grbx = ProtoCh::getProtoBox(grid);
-      for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
-      {
-        auto vofs = graph.getVoFs(*bit);
-        numPtsThisProc += vofs.size();
-      }
-    }
-    
 
-    //decide which location maps to the first one of this proc
-    m_numPtsThisProc = numPtsThisProc;
+    IntVect idghosts = m_ivghost;
+    if (idghosts == IntVect::Zero)
+    {
+      Chombo4::MayDay::Error("PetscSolver<T>::create_mat_vec: No ghost cells in input LevelData<>.");
+    }
+    // global ids with ghost cells
+    m_gids.define(m_grids, 1, idghosts);
+
+    // get first (zero based) id on this processor      
+    PetscInt data = 0;
+    for ( auto dit = m_grids.dataIterator() ; dit.ok() ; ++dit )
+    {
+      const Chombo4::Box &box = m_grids[dit()]; // not ghosted
+      data += box.numPts();
+      BaseFab<PetscInt> &gidsFab = this->m_gids[dit]; 
+      gidsFab.setVal(-1); // flag for BC eventually
+    }
 #ifdef CH_MPI
-    PetscInt data = numPtsThisProc;
     PetscInt result;
     MPI_Datatype mtype;
     PetscDataTypeToMPIDataType(PETSC_INT,&mtype);
     MPI_Scan( &data, &result, 1, mtype, MPI_SUM, wcomm );
-    int startgid =  result - data;
-
-    CH4_SPMD::gather<int>(m_numPtsAllProc, numPtsThisProc, 0);
-    CH4_SPMD::broadcast<Vector<int> >(  m_numPtsAllProc, 0);
-    m_numPtsTotal = 0;
-    for(int iproc = 0; iproc < m_numPtsAllProc.size(); iproc++)
-    {
-      m_numPtsTotal += m_numPtsAllProc[iproc];
-    }
-    
-//    int startgid = 0;
-//    for(int iproc = 0; iproc < Chombo4::procID(); iproc++)
-//    {
-//      startgid += m_numPtsAllProc[iproc];
-//    }
-    using Chombo4::pout;
-    using Chombo4::procID;
-    pout()  << "procID = " << procID() << ", numPtsThisProc = " << numPtsThisProc << ", startgid = " << startgid << endl;
+    m_gid0 = result - data;
 #else
-    int startgid = 0;
+    m_gid0 = 0;
 #endif
-    m_gid0     = startgid;
-    m_NN       = numPtsThisProc;
-    
-    int curgid = startgid;
-    for(int ibox = 0; ibox < dit.size(); ibox++)
+    //total number of points
+    m_NN = data;
+    PetscInt gid = m_gid0;
+    for (auto dit = m_grids.dataIterator() ; dit.ok() ; ++dit )
     {
-      auto graph = (*m_graphs)[dit[ibox]];
-      auto grid  =     m_grids[dit[ibox]];
-      Bx  grbx = ProtoCh::getProtoBox(grid);
-      for(auto bit = grbx.begin(); bit != grbx.end(); ++bit)
+      BaseFab<PetscInt> &gidsFab = this->m_gids[dit]; 
+      const Chombo4::Box& box = m_grids[dit()];
+      Chombo4::BoxIterator bit(box);
+      for (bit.begin(); bit.ok(); bit.next(), gid++ )
       {
-        auto vofs = graph.getVoFs(*bit);
-        for(int ivof = 0; ivof < vofs.size(); ivof++)
-        {
-          m_gids[dit[ibox]](vofs[ivof], 0) = curgid;
-          curgid++;
-        }
+        IntVect iv = bit();
+        gidsFab(iv,0) = gid;
       }
     }
-    Chombo4::Copier exchangeCopier;
-    exchangeCopier.exchangeDefine(m_grids, gidghost);
-    m_gids.exchange(exchangeCopier);
+    m_gids.exchange();
+
     return 0;
   }
 
   //index space--allows us to to matrix to solution space
-  LevelData<EBHostData<CELL, int, 1> > m_gids;
+  LevelData<BaseFab<PetscInt> >  m_gids;
   PetscInt m_gid0;
+
   PetscInt m_NN;
 
 
@@ -507,7 +518,6 @@ private:
   string m_domainBCName[2*DIM];
   string m_ebbcName;
 
-  Vector<int> m_numPtsAllProc;
   Point   m_ptghost;
   IntVect m_ivghost;
 
@@ -526,8 +536,6 @@ private:
   void *m_ctx; // pointer for nonlnear solver call backs
 
 
-  PetscInt m_numPtsThisProc;
-  PetscInt m_numPtsTotal;
 
   Real m_alpha, m_beta;
 };
